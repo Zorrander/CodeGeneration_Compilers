@@ -62,7 +62,9 @@ enum EToken {
 
   tIdent,                           ///< an identifier
   tNumber,                          ///< a number
-
+  
+  tString,                          ///< a string
+  
   tKeyword,                         ///< a keyword
 
   tEOF,                             ///< end of file

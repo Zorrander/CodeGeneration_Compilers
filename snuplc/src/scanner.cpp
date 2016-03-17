@@ -64,6 +64,8 @@ char ETokenName[][TOKEN_STRLEN] = {
   "tIdent",                         ///< an identifier
   "tNumber",                        ///< a number
   
+  "tString",                        ///< a string
+  
   "tKeyword",                       ///< a keyword
 
   "tEOF",                           ///< end of file
@@ -90,7 +92,9 @@ char ETokenStr[][TOKEN_STRLEN] = {
 
   "tIdent (%s)",                    ///< an identifier
   "tNumber (%s)",                   ///< a number
-
+  
+  "tString (%s)",                   ///< a string
+  
   "tKeyword (%s)",                  ///< a keyword
   
   "tEOF",                           ///< end of file
@@ -366,6 +370,14 @@ CToken* CScanner::Scan()
 
   case ')':
     token = tRBrak;
+    break;
+
+  case '\"':
+    tokval = ""; //flushes beginning '\"'
+    while ( (c = GetChar()) != '\"') //flushes ending '\"'
+	tokval += c;
+    
+    token = tString;
     break;
 
   default:
