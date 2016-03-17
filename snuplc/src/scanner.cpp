@@ -61,6 +61,9 @@ char ETokenName[][TOKEN_STRLEN] = {
   "tLBrak",                         ///< a left bracket
   "tRBrak",                         ///< a right bracket
 
+  "tIdent",                         ///< an identifier
+  "tNumber",                        ///< a number
+
   "tEOF",                           ///< end of file
   "tIOError",                       ///< I/O error
   "tUndefined",                     ///< undefined
@@ -83,6 +86,9 @@ char ETokenStr[][TOKEN_STRLEN] = {
   "tLBrak",                         ///< a left bracket
   "tRBrak",                         ///< a right bracket
 
+  "tIdent (%s)",                    ///< an identifier
+  "tNumber (%s)",                   ///< a number
+  
   "tEOF",                           ///< end of file
   "tIOError",                       ///< I/O error
   "tUndefined (%s)",                ///< undefined
@@ -93,8 +99,8 @@ char ETokenStr[][TOKEN_STRLEN] = {
 // reserved keywords
 //
 pair<const char*, EToken> Keywords[] =
-{
-};
+  {
+  };
 
 
 
@@ -160,13 +166,13 @@ string CToken::escape(const string text)
 
   while (*t != '\0') {
     switch (*t) {
-      case '\n': s += "\\n";  break;
-      case '\t': s += "\\t";  break;
-      case '\0': s += "\\0";  break;
-      case '\'': s += "\\'";  break;
-      case '\"': s += "\\\""; break;
-      case '\\': s += "\\\\"; break;
-      default :  s += *t;
+    case '\n': s += "\\n";  break;
+    case '\t': s += "\\t";  break;
+    case '\0': s += "\\0";  break;
+    case '\'': s += "\\'";  break;
+    case '\"': s += "\\\""; break;
+    case '\\': s += "\\\\"; break;
+    default :  s += *t;
     }
     t++;
   }
@@ -275,67 +281,90 @@ CToken* CScanner::Scan()
   char c;
 
   while (_in->good() && IsWhite(_in->peek())) GetChar();
-
+  
   RecordStreamPosition();
 
   if (_in->eof()) return NewToken(tEOF);
   if (!_in->good()) return NewToken(tIOError);
 
   c = GetChar();
+  
+  while (c == '/' && _in->peek() == '/'){
+
+    GetChar();
+    while (_in->good() && GetChar() != '\n') {}
+    while (_in->good() && IsWhite(_in->peek())) GetChar();
+
+    RecordStreamPosition();
+
+    if (_in->eof()) return NewToken(tEOF);
+    if (!_in->good()) return NewToken(tIOError);
+
+    c = GetChar();
+  }
+
   tokval = c;
   token = tUndefined;
 
   switch (c) {
-    case ':':
-      if (_in->peek() == '=') {
-        tokval += GetChar();
-        token = tAssign;
+  case ':':
+    if (_in->peek() == '=') {
+      tokval += GetChar();
+      token = tAssign;
+    }
+    break;
+
+  case '+':
+  case '-':
+    token = tPlusMinus;
+    break;
+
+  case '*':
+  case '/':
+    token = tMulDiv;
+    break;
+
+  case '=':
+  case '#':
+    token = tRelOp;
+    break;
+
+  case ';':
+    token = tSemicolon;
+    break;
+
+  case '.':
+    token = tDot;
+    break;
+
+  case '(':
+    token = tLBrak;
+    break;
+
+  case ')':
+    token = tRBrak;
+    break;
+
+  default:
+    if (IsDigit(c)) {
+      //token = tDigit;
+      while (IsDigit(_in->peek())) {
+	tokval += GetChar();
       }
-      break;
-
-    case '+':
-    case '-':
-      token = tPlusMinus;
-      break;
-
-    case '*':
-    case '/':
-      token = tMulDiv;
-      break;
-
-    case '=':
-    case '#':
-      token = tRelOp;
-      break;
-
-    case ';':
-      token = tSemicolon;
-      break;
-
-    case '.':
-      token = tDot;
-      break;
-
-    case '(':
-      token = tLBrak;
-      break;
-
-    case ')':
-      token = tRBrak;
-      break;
-
-    default:
-      if (('0' <= c) && (c <= '9')) {
-        token = tDigit;
-      } else
-      if (('a' <= c) && (c <= 'z')) {
-        token = tLetter;
+      token = tNumber;
+    } else
+      if (IsLetter(c)) {
+	//token = tLetter;
+	while (IsLetter(_in->peek()) || IsDigit(_in->peek())) {
+	  tokval += GetChar();
+	}
+	token = tIdent;
       } else {
         tokval = "invalid character '";
         tokval += c;
         tokval += "'";
       }
-      break;
+    break;
   }
 
   return NewToken(token, tokval);
@@ -358,4 +387,16 @@ string CScanner::GetChar(int n)
 bool CScanner::IsWhite(char c) const
 {
   return ((c == ' ') || (c == '\n'));
+}
+
+bool CScanner::IsLetter(char c) const
+{
+  return ( (('a' <= c) && (c <= 'z')) || 
+	   (('A' <= c) && (c <= 'Z')) || 
+	   (c == '_') );
+}
+
+bool CScanner::IsDigit(char c) const
+{
+  return ( ('0' <= c) && (c <= '9') );
 }

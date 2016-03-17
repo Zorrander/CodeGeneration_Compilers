@@ -60,6 +60,9 @@ enum EToken {
   tLBrak,                           ///< a left bracket
   tRBrak,                           ///< a right bracket
 
+  tIdent,                           ///< an identifier
+  tNumber,                          ///< a number
+
   tEOF,                             ///< end of file
   tIOError,                         ///< I/O error
   tUndefined,                       ///< undefined
@@ -280,6 +283,20 @@ class CScanner {
     /// @retval true character is white space
     /// @retval false character is not white space
     bool IsWhite(char c) const;
+
+    /// @brief check if character is a letter = "A”.."Z" | "a".."z" | "_"
+    ///
+    /// @param c character
+    /// @retval true character is a letter
+    /// @retval false character is not a letter
+    bool IsLetter(char c) const;
+
+    /// @brief check if character is a digit = "0".."9"
+    ///
+    /// @param c character
+    /// @retval true character is a digit
+    /// @retval false character is not a digit
+    bool IsDigit(char c) const;
 
     /// @}
 
