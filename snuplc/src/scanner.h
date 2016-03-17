@@ -63,6 +63,8 @@ enum EToken {
   tIdent,                           ///< an identifier
   tNumber,                          ///< a number
 
+  tKeyword,                         ///< a keyword
+
   tEOF,                             ///< end of file
   tIOError,                         ///< I/O error
   tUndefined,                       ///< undefined
@@ -297,6 +299,13 @@ class CScanner {
     /// @retval true character is a digit
     /// @retval false character is not a digit
     bool IsDigit(char c) const;
+
+    /// @brief check if string is a keyword
+    ///
+    /// @param str string
+    /// @retval true string is a keyword
+    /// @retval false string is not a keyword
+    bool IsKeyword(string str);
 
     /// @}
 

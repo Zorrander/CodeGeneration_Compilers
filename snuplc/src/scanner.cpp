@@ -63,6 +63,8 @@ char ETokenName[][TOKEN_STRLEN] = {
 
   "tIdent",                         ///< an identifier
   "tNumber",                        ///< a number
+  
+  "tKeyword",                       ///< a keyword
 
   "tEOF",                           ///< end of file
   "tIOError",                       ///< I/O error
@@ -88,6 +90,8 @@ char ETokenStr[][TOKEN_STRLEN] = {
 
   "tIdent (%s)",                    ///< an identifier
   "tNumber (%s)",                   ///< a number
+
+  "tKeyword (%s)",                  ///< a keyword
   
   "tEOF",                           ///< end of file
   "tIOError",                       ///< I/O error
@@ -100,6 +104,25 @@ char ETokenStr[][TOKEN_STRLEN] = {
 //
 pair<const char*, EToken> Keywords[] =
   {
+    
+    std::make_pair("module", tKeyword),
+    std::make_pair("procedure", tKeyword),
+    std::make_pair("function", tKeyword),
+    std::make_pair("var", tKeyword),
+    std::make_pair("integer", tKeyword),
+    std::make_pair("boolean", tKeyword),
+    std::make_pair("char", tKeyword),
+    std::make_pair("begin", tKeyword),
+    std::make_pair("end", tKeyword),
+    std::make_pair("if", tKeyword),
+    std::make_pair("then", tKeyword),
+    std::make_pair("else", tKeyword),
+    std::make_pair("while", tKeyword),
+    std::make_pair("do", tKeyword),
+    std::make_pair("return", tKeyword),
+    std::make_pair("true", tKeyword),
+    std::make_pair("false", tKeyword),
+    
   };
 
 
@@ -347,18 +370,21 @@ CToken* CScanner::Scan()
 
   default:
     if (IsDigit(c)) {
-      //token = tDigit;
       while (IsDigit(_in->peek())) {
 	tokval += GetChar();
       }
       token = tNumber;
     } else
       if (IsLetter(c)) {
-	//token = tLetter;
 	while (IsLetter(_in->peek()) || IsDigit(_in->peek())) {
 	  tokval += GetChar();
 	}
-	token = tIdent;
+	// Compare tabular value
+	if (IsKeyword(tokval)){
+	  token = tKeyword;
+	}
+	else
+	  token = tIdent;
       } else {
         tokval = "invalid character '";
         tokval += c;
@@ -399,4 +425,20 @@ bool CScanner::IsLetter(char c) const
 bool CScanner::IsDigit(char c) const
 {
   return ( ('0' <= c) && (c <= '9') );
+}
+
+bool CScanner::IsKeyword(string str)
+{
+  int size = sizeof(Keywords) / sizeof(Keywords[0]);
+  bool res = false;
+  const char * c = str.c_str();
+  for (int i = 0; i < size; i++)
+    {
+      if (strcmp(c, Keywords[i].first) == 0)
+	{
+	  res = true;
+	  break;
+	}
+    }
+  return res;
 }
