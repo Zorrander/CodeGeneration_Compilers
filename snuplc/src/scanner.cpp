@@ -63,7 +63,7 @@ char ETokenName[][TOKEN_STRLEN] = {
 
   "tIdent",                         ///< an identifier
   "tNumber",                        ///< a number
-  
+  "tChar",                          ///< a character
   "tString",                        ///< a string
   
   "tKeyword",                       ///< a keyword
@@ -92,7 +92,7 @@ char ETokenStr[][TOKEN_STRLEN] = {
 
   "tIdent (%s)",                    ///< an identifier
   "tNumber (%s)",                   ///< a number
-  
+  "tChar (%s)",                     ///< a character
   "tString (%s)",                   ///< a string
   
   "tKeyword (%s)",                  ///< a keyword
@@ -375,8 +375,15 @@ CToken* CScanner::Scan()
   case '\"':
     tokval = ""; //flushes beginning '\"'
     while ( (c = GetChar()) != '\"') //flushes ending '\"'
+      {
+	/* Don't know if is handles escapes correctly
+	if (c == '\\')
+	  {
+	    
+	  }
+	*/
 	tokval += c;
-    
+      }
     token = tString;
     break;
 

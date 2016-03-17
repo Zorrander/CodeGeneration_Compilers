@@ -62,7 +62,7 @@ enum EToken {
 
   tIdent,                           ///< an identifier
   tNumber,                          ///< a number
-  
+  tChar,                            ///< a character
   tString,                          ///< a string
   
   tKeyword,                         ///< a keyword
