@@ -61,6 +61,13 @@ char ETokenName[][TOKEN_STRLEN] = {
   "tLBrak",                         ///< a left bracket
   "tRBrak",                         ///< a right bracket
 
+  "tComma",                         ///< a comma
+  "tColon",                         ///< a colon
+  "tLSqBrak",                       ///< a left square bracket
+  "tRSqBrak",                       ///< a right square bracket
+
+  "tNot",                           ///< a '!'
+  
   "tIdent",                         ///< an identifier
   "tNumber",                        ///< a number
   "tChar",                          ///< a character
@@ -89,6 +96,13 @@ char ETokenStr[][TOKEN_STRLEN] = {
   "tDot",                           ///< a dot
   "tLBrak",                         ///< a left bracket
   "tRBrak",                         ///< a right bracket
+
+  "tComma",                         ///< a comma
+  "tColon",                         ///< a colon
+  "tLSqBrak",                       ///< a left square bracket
+  "tRSqBrak",                       ///< a right square bracket
+  
+  "tNot",                           ///< a '!'
 
   "tIdent (%s)",                    ///< an identifier
   "tNumber (%s)",                   ///< a number
@@ -335,10 +349,15 @@ CToken* CScanner::Scan()
 
   switch (c) {
   case ':':
-    if (_in->peek() == '=') {
-      tokval += GetChar();
-      token = tAssign;
-    }
+    if (_in->peek() == '=') 
+      {
+	tokval += GetChar();
+	token = tAssign;
+      }
+    else
+      {
+	token = tColon;
+      }
     break;
 
   case '+':
@@ -350,9 +369,36 @@ CToken* CScanner::Scan()
   case '/':
     token = tMulDiv;
     break;
+    
+  case '|':
+    if (_in->peek() == '|')
+      {
+	tokval += GetChar();
+	token = tMulDiv;
+      }   
+    break;
 
+  case '&':
+    if (_in->peek() == '&')
+      {
+	tokval += GetChar();
+	token = tPlusMinus;
+      }   
+    break;
+
+  case '!':
+    token = tNot;
+    break;
+    
   case '=':
   case '#':
+  case '<':
+  case '>':
+    if (c == '<' && _in->peek() == '=')
+      tokval += GetChar();
+    else if (c == '>' && _in->peek() == '=')
+      tokval += GetChar();
+    
     token = tRelOp;
     break;
 
@@ -370,6 +416,56 @@ CToken* CScanner::Scan()
 
   case ')':
     token = tRBrak;
+    break;
+    
+  case ',':
+    token = tComma;
+    break;
+
+  case '[':
+    token = tLSqBrak;
+    break;
+
+  case ']':
+    token = tRSqBrak;
+    break;
+
+  case '\'':
+    tokval = ""; //flushes beginning '\''
+    c = GetChar();
+
+    bool b;
+    
+    tokval = c;
+    if ( c == '\\' && IsEscape(_in->peek()) )
+      {
+	c = GetChar();
+	tokval += c;
+	b = true;
+      }
+    else if( c == '\\' && !IsEscape(_in->peek()) )
+      {
+	c = GetChar();
+	tokval += c;
+	b = false;
+      }
+    else
+      b = true;
+    
+    c = GetChar();
+    if (c == '\'' && b)
+      {
+        token = tChar;
+      }
+    else if (c == '\'' && !b)
+      {
+	//token unindent
+      }
+    else
+      {
+	while ( (c = GetChar()) != '\'' ) {} // flushing until ending "'"
+      }
+    
     break;
 
   case '\"':
@@ -460,4 +556,9 @@ bool CScanner::IsKeyword(string str)
 	}
     }
   return res;
+}
+
+bool CScanner::IsEscape(char c)
+{
+  return (c == 'n' || c == 't' || c == '0' || c == '\'' || c == '\"' || c == '\\');
 }

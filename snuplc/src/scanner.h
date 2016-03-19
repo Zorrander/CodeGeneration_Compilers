@@ -60,6 +60,13 @@ enum EToken {
   tLBrak,                           ///< a left bracket
   tRBrak,                           ///< a right bracket
 
+  tComma,                           ///< a comma
+  tColon,                           ///< a colon
+  tLSqBrak,                         ///< a left square bracket
+  tRSqBrak,                         ///< a right square bracket
+
+  tNot,                             ///< a '!'
+
   tIdent,                           ///< an identifier
   tNumber,                          ///< a number
   tChar,                            ///< a character
@@ -308,6 +315,13 @@ class CScanner {
     /// @retval true string is a keyword
     /// @retval false string is not a keyword
     bool IsKeyword(string str);
+
+    /// @brief check if character is escape
+    ///
+    /// @param c char
+    /// @retval true character is an escape
+    /// @retval false character is not an escape
+    bool IsEscape(char c);
 
     /// @}
 
