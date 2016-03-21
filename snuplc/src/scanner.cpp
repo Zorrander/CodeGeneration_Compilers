@@ -317,6 +317,7 @@ CToken* CScanner::NewToken(EToken type, const string token)
 
 CToken* CScanner::Scan()
 {
+ 
   EToken token;
   string tokval;
   char c;
@@ -431,53 +432,36 @@ CToken* CScanner::Scan()
     break;
 
   case '\'':
-    tokval = ""; //flushes beginning '\''
+    tokval = ""; // flushes beginning '\''
     c = GetChar();
 
     bool b;
-    
-    tokval = c;
-    if ( c == '\\' && IsEscape(_in->peek()) )
-      {
-	c = GetChar();
-	tokval += c;
-	b = true;
-      }
-    else if( c == '\\' && !IsEscape(_in->peek()) )
-      {
-	c = GetChar();
-	tokval += c;
-	b = false;
-      }
-    else
-      b = true;
+    b = IsCharacter(c, &tokval);
     
     c = GetChar();
     if (c == '\'' && b)
       {
         token = tChar;
       }
-    else if (c == '\'' && !b)
+    else if (c == '\'' && !b) // redundant because illegal characters overflow
       {
-	//token unindent
+	string temp = "invalid character '";
+	temp += tokval;
+	tokval = temp += "'";
       }
     else
       {
-	while ( (c = GetChar()) != '\'' ) {} // flushing until ending "'"
+	while (_in->good() && (c = GetChar()) != '\'' ) {} // flushing until ending "'"
+	tokval = "more than one character detected";
       }
-    
+
     break;
 
   case '\"':
-    tokval = ""; //flushes beginning '\"'
-    while ( (c = GetChar()) != '\"') //flushes ending '\"'
+    tokval = ""; // flushes beginning '\"'
+    while (_in->good() && (c = GetChar()) != '\"') // flushes ending '\"'
       {
-	/* Don't know if is handles escapes correctly
-	if (c == '\\')
-	  {
-	    
-	  }
-	*/
+	//if ischar
 	tokval += c;
       }
     token = tString;
@@ -501,7 +485,7 @@ CToken* CScanner::Scan()
 	else
 	  token = tIdent;
       } else {
-        tokval = "invalid character '";
+        tokval = "invalid letter '";
         tokval += c;
         tokval += "'";
       }
@@ -542,6 +526,31 @@ bool CScanner::IsDigit(char c) const
   return ( ('0' <= c) && (c <= '9') );
 }
 
+bool CScanner::IsCharacter(char c, string *tokval)
+{
+  bool b;
+    
+  *tokval += c;
+  if ( c == '\\' && IsCharEscape(_in->peek()) )
+    {
+      c = GetChar();
+      *tokval += c;
+      b = true;
+    }
+  else if( c == '\\' && !IsCharEscape(_in->peek()) )
+    {
+      c = GetChar();
+      *tokval += c;
+      b =  false;
+    }
+  else if( c <= 127 )
+    b = true;
+  else
+    b = false;
+  
+  return b;
+}
+
 bool CScanner::IsKeyword(string str)
 {
   int size = sizeof(Keywords) / sizeof(Keywords[0]);
@@ -558,7 +567,8 @@ bool CScanner::IsKeyword(string str)
   return res;
 }
 
-bool CScanner::IsEscape(char c)
+bool CScanner::IsCharEscape(char c)
 {
-  return (c == 'n' || c == 't' || c == '0' || c == '\'' || c == '\"' || c == '\\');
+  //return (c == 'n' || c == 't' || c == '0' || c == '\'' || c == '\"' || c == '\\');
+  return (c == 'n' || c == 't');
 }

@@ -309,6 +309,13 @@ class CScanner {
     /// @retval false character is not a digit
     bool IsDigit(char c) const;
 
+    /// @brief check if character is ASCII character [0, 127]
+    ///
+    /// @param c char
+    /// @retval true character is an ASCII character
+    /// @retval false character is an not ASCII character
+    bool IsCharacter(char c, string *tokval);
+    
     /// @brief check if string is a keyword
     ///
     /// @param str string
@@ -321,7 +328,9 @@ class CScanner {
     /// @param c char
     /// @retval true character is an escape
     /// @retval false character is not an escape
-    bool IsEscape(char c);
+    bool IsCharEscape(char c);
+
+    
 
     /// @}
 
