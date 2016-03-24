@@ -348,6 +348,8 @@ CToken* CScanner::Scan()
   tokval = c;
   token = tUndefined;
 
+  string temp_str = "";
+
   switch (c) {
   case ':':
     if (_in->peek() == '=') 
@@ -433,12 +435,18 @@ CToken* CScanner::Scan()
 
   case '\'':
     tokval = ""; // flushes beginning '\''
-    c = GetChar();
+    if((c = GetChar()) == '\'') // Takes care of case with empty char: ''
+      {
+	tokval = "";
+	token = tChar;
+	break;
+      }
 
     bool b;
     b = IsCharacter(c, &tokval);
-    
+    //cout << (int)c << ": " << b << endl;
     c = GetChar();
+    
     if (c == '\'' && b)
       {
         token = tChar;
@@ -458,11 +466,15 @@ CToken* CScanner::Scan()
     break;
 
   case '\"':
+    
     tokval = ""; // flushes beginning '\"'
-    while (_in->good() && (c = GetChar()) != '\"') // flushes ending '\"'
+    while (_in->good() && (c = GetChar()) != '\"') // reads string and flushes ending '\"'
       {
-	//if ischar
-	tokval += c;
+	temp_str = "";
+	if(IsCharacter(c, &temp_str))
+	  {
+	    tokval.append(temp_str); 
+	  }
       }
     token = tString;
     break;
@@ -478,7 +490,6 @@ CToken* CScanner::Scan()
 	while (IsLetter(_in->peek()) || IsDigit(_in->peek())) {
 	  tokval += GetChar();
 	}
-	// Compare tabular value
 	if (IsKeyword(tokval)){
 	  token = tKeyword;
 	}
@@ -543,7 +554,7 @@ bool CScanner::IsCharacter(char c, string *tokval)
       *tokval += c;
       b =  false;
     }
-  else if( c <= 127 )
+  else if( c >= 32 && c <= 127 )
     b = true;
   else
     b = false;
@@ -569,6 +580,5 @@ bool CScanner::IsKeyword(string str)
 
 bool CScanner::IsCharEscape(char c)
 {
-  //return (c == 'n' || c == 't' || c == '0' || c == '\'' || c == '\"' || c == '\\');
-  return (c == 'n' || c == 't');
+  return (c == 'n' || c == 't' || c == '0' || c == '\'' || c == '\"' || c == '\\');
 }
