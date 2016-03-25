@@ -52,8 +52,8 @@ using namespace std;
 char ETokenName[][TOKEN_STRLEN] = {
   "tDigit",                         ///< a digit
   "tLetter",                        ///< a letter
-  "tTermOp",                     ///< '+' or '-'
-  "tFactOp",                        ///< '*' or '/'
+  "tTermOp",                        ///< '+' or '-' or '||'
+  "tFactOp",                        ///< '*' or '/' or '&&'
   "tRelOp",                         ///< relational operator
   "tAssign",                        ///< assignment operator
   "tSemicolon",                     ///< a semicolon
@@ -88,8 +88,8 @@ char ETokenName[][TOKEN_STRLEN] = {
 char ETokenStr[][TOKEN_STRLEN] = {
   "tDigit (%s)",                    ///< a digit
   "tLetter (%s)",                   ///< a letter
-  "tTermOp (%s)",                ///< '+' or '-'
-  "tFactOp (%s)",                   ///< '*' or '/'
+  "tTermOp (%s)",                   ///< '+' or '-' or '||'
+  "tFactOp (%s)",                   ///< '*' or '/' or '&&'
   "tRelOp (%s)",                    ///< relational operator
   "tAssign",                        ///< assignment operator
   "tSemicolon",                     ///< a semicolon
