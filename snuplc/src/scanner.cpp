@@ -52,8 +52,8 @@ using namespace std;
 char ETokenName[][TOKEN_STRLEN] = {
   "tDigit",                         ///< a digit
   "tLetter",                        ///< a letter
-  "tPlusMinus",                     ///< '+' or '-'
-  "tMulDiv",                        ///< '*' or '/'
+  "tTermOp",                     ///< '+' or '-'
+  "tFactOp",                        ///< '*' or '/'
   "tRelOp",                         ///< relational operator
   "tAssign",                        ///< assignment operator
   "tSemicolon",                     ///< a semicolon
@@ -88,8 +88,8 @@ char ETokenName[][TOKEN_STRLEN] = {
 char ETokenStr[][TOKEN_STRLEN] = {
   "tDigit (%s)",                    ///< a digit
   "tLetter (%s)",                   ///< a letter
-  "tPlusMinus (%s)",                ///< '+' or '-'
-  "tMulDiv (%s)",                   ///< '*' or '/'
+  "tTermOp (%s)",                ///< '+' or '-'
+  "tFactOp (%s)",                   ///< '*' or '/'
   "tRelOp (%s)",                    ///< relational operator
   "tAssign",                        ///< assignment operator
   "tSemicolon",                     ///< a semicolon
@@ -365,19 +365,19 @@ CToken* CScanner::Scan()
 
   case '+':
   case '-':
-    token = tPlusMinus;
+    token = tTermOp;
     break;
 
   case '*':
   case '/':
-    token = tMulDiv;
+    token = tFactOp;
     break;
     
   case '|':
     if (_in->peek() == '|')
       {
 	tokval += GetChar();
-	token = tMulDiv;
+	token = tTermOp;
       }   
     break;
 
@@ -385,7 +385,7 @@ CToken* CScanner::Scan()
     if (_in->peek() == '&')
       {
 	tokval += GetChar();
-	token = tPlusMinus;
+	token = tFactOp;
       }   
     break;
 
