@@ -444,7 +444,6 @@ CToken* CScanner::Scan()
 
     bool b;
     b = IsCharacter(c, &tokval);
-    //cout << (int)c << ": " << b << endl;
     c = GetChar();
     
     if (c == '\'' && b)

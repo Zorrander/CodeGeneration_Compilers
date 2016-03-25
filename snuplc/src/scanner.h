@@ -51,8 +51,8 @@ using namespace std;
 enum EToken {
   tDigit=0,                         ///< a digit
   tLetter,                          ///< a letter
-  tPlusMinus,                       ///< '+' or '-'
-  tMulDiv,                          ///< '*' or '/'
+  tTermOp,                          ///< '+' or '-' or '||'
+  tFactOp,                          ///< '*' or '/' or '&&'
   tRelOp,                           ///< relational operator
   tAssign,                          ///< assignment operator
   tSemicolon,                       ///< a semicolon
