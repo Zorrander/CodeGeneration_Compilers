@@ -141,7 +141,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
   //
   // statSequence ::= [ statement { ";" statement } ].
   // statement ::= assignment.
-  // FIRST(statSequence) = { tNumber }
+  // FIRST(statSequence) = { tIdent }
   // FOLLOW(statSequence) = { tDot }
   //
   CAstStatement *head = NULL;
@@ -157,13 +157,18 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 
       switch (tt) {
         // statement ::= assignment
-        case tNumber:
-          st = assignment(s);
-          break;
+      case tIdent:
+	Consume(tIdent, &t);
+	if (_scanner->Peek().GetType() == tAssign)
+	  {
+	    cout << "hej" << endl;
+	    st = assignment(s, t);
+	  }
+	break;
 
-        default:
-          SetError(_scanner->Peek(), "statement expected.");
-          break;
+      default:
+	SetError(_scanner->Peek(), "statement expected.");
+	break;
       }
 
       assert(st != NULL);
@@ -181,14 +186,14 @@ CAstStatement* CParser::statSequence(CAstScope *s)
   return head;
 }
 
-CAstStatAssign* CParser::assignment(CAstScope *s)
+CAstStatAssign* CParser::assignment(CAstScope *s, CToken t)
 {
   //
-  // assignment ::= number ":=" expression.
+  // assignment ::= qualident ":=" expression.
   //
-  CToken t;
+  
+  CAstStringConstant *lhs = qualident(s, t);
 
-  CAstConstant *lhs = number();
   Consume(tAssign, &t);
 
   CAstExpression *rhs = expression(s);
@@ -286,21 +291,21 @@ CAstExpression* CParser::factor(CAstScope *s)
 
   switch (tt) {
     // factor ::= number
-    case tNumber:
-      n = number();
-      break;
+  case tNumber:
+    n = number();
+    break;
 
     // factor ::= "(" expression ")"
-    case tLBrak:
-      Consume(tLBrak);
-      n = expression(s);
-      Consume(tRBrak);
-      break;
+  case tLBrak:
+    Consume(tLBrak);
+    n = expression(s);
+    Consume(tRBrak);
+    break;
 
-    default:
-      cout << "got " << _scanner->Peek() << endl;
-      SetError(_scanner->Peek(), "factor expected.");
-      break;
+  default:
+    cout << "got " << _scanner->Peek() << endl;
+    SetError(_scanner->Peek(), "factor expected.");
+    break;
   }
 
   return n;
@@ -325,3 +330,18 @@ CAstConstant* CParser::number(void)
   return new CAstConstant(t, CTypeManager::Get()->GetInt(), v);
 }
 
+CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
+{
+  //
+  // qualident ::= ident { "[" expression "]" }
+  // ident ::= tIdent
+  // expression ::= simpleexpr [ relOp simplexpr ].
+  // FIRST(qualident) = { tIdent }
+  // FOLLOW(qualident) = { tAssign | tDot }
+  
+  //CToken t;
+  //Consume(tIdent, &t);
+  //cout << "hej" << endl;
+  return new CAstStringConstant(t, "hej", s);
+  //CTypeManager::Get()->GetChar()
+}

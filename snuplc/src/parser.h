@@ -99,7 +99,7 @@ class CParser {
 
     CAstStatement*    statSequence(CAstScope *s);
 
-    CAstStatAssign*   assignment(CAstScope *s);
+    CAstStatAssign*   assignment(CAstScope *s, CToken t);
 
     CAstExpression*   expression(CAstScope *s);
     CAstExpression*   simpleexpr(CAstScope *s);
@@ -107,6 +107,7 @@ class CParser {
     CAstExpression*   factor(CAstScope *s);
 
     CAstConstant*     number(void);
+    CAstStringConstant*     qualident(CAstScope* s, CToken t);
 
     /// @}
 
