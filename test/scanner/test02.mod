@@ -6,8 +6,8 @@
 
 // scannable input
 <===>=#:=:::==>;;;if(then)else;a:=-1.1;a::==0x5;
-1a2b
-"hello ÇÄ world" 
+1a2b&&hej||
+"hello ÇÄ worÄld" 
 
 hello
 // invalid input
@@ -27,6 +27,8 @@ testchars
 '"'
 '''hh'
 endtestchars
-'Ä'
+'Ä'hej
 'Ç'
+hej
+"
 hej
