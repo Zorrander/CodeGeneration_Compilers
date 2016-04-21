@@ -152,11 +152,15 @@ CAstStatement* CParser::statSequence(CAstScope *s)
   if (!(tt == tDot)) {
     CAstStatement *tail = NULL;
 
+    //CAstStringConstant *hej1;
+    //CAstExpression *hej2;
+    //CToken hejTok = tAssign;
+
     do {
       CToken t;
       EToken tt = _scanner->Peek().GetType();
       CAstStatement *st = NULL;
-
+      
       switch (tt) {
         
       case tIdent:
@@ -167,8 +171,25 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= subroutineCall
 	else
 	  {
-	    // What do we do with the "("?
-	    // if peek == "expression"
+	    CToken t2 = t;
+	    Consume(tLBrak, &t);
+	    /* ### Combine tIdent and expession to CAstSubroutine (?) ### */
+	    if (_scanner->Peek().GetType() == tRBrak)
+	      {
+		Consume(tRBrak, &t);
+		//st = new CAstStatCall(); ###
+	      }
+	    else
+	      {
+		expression(s);
+		while (_scanner->Peek().GetType() == tComma)
+		  {
+		    Consume(tComma, &t);
+		    expression(s);
+		  }
+		//st = new CAstStatCall(); ###
+		Consume(tRBrak, &t);
+	      }
 	    // Consume expression
 	    // while peek == ","
 	    // Consume "," and "expression"
@@ -180,10 +201,45 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	
       case tKeyword:
 	Consume(tKeyword, &t);
+	cout << "Keyword: " << t.GetValue() << endl;
 	// statement ::= ifStatement
 	if (!t.GetValue().compare("if")) 
 	  {  
 	    // "("
+	    Consume(tLBrak, &t);
+	    expression(s);
+	    Consume(tRBrak, &t);
+	    
+	    Consume(tKeyword, &t);
+	    if (t.GetValue().compare("then"))
+	      {
+		SetError(_scanner->Peek(), "Keyword \"then\" expected");
+		break;
+	      }
+	    
+	    statSequence(s);
+	    cout << "First end123123123, keyword: " << t.GetValue() << endl;
+	    Consume(tKeyword, &t);
+	    if (!t.GetValue().compare("end"))
+	      {
+		// ### ifStat ###
+		cout << "First end, keyword: " << t.GetValue() << endl;
+		break;
+	      }
+	    else if (!t.GetValue().compare("else"))
+	      {
+		statSequence(s);
+		Consume(tKeyword, &t);
+		if (!t.GetValue().compare("end"))
+		  {
+		    // ### Return ifStat ###
+		    cout << "Second  end, keyword: " << t.GetValue() << endl;
+		    break;
+		  }
+	      }
+
+	    SetError(_scanner->Peek(), "Keyword \"end or else\"");
+	    
 	    // "expression"
 	    // "then"
 	    // "statSequence"
@@ -209,8 +265,10 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	    // "expression"
 	  }
 	// error
-	else { SetError(_scanner->Peek(), "Keyword { if | while | return } expected."); }
 	
+	// ### else if peek == end return, since end is in follow of statSequence. ###
+	
+	else { SetError(_scanner->Peek(), "Got \"" + t.GetValue() + "\", expected keyword { if | while | return } expected." ); }
 	break;
 	
       default:
@@ -218,10 +276,12 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	break;
       }
 
-      assert(st != NULL);
+      //assert(st != NULL);
       if (head == NULL) head = st;
-      else tail->SetNext(st);
+      //else tail->SetNext(st);
       tail = st;
+
+      
 
       tt = _scanner->Peek().GetType();
       if (tt == tDot) break;
