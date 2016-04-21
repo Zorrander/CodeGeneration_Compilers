@@ -42,6 +42,8 @@
 #include <iostream>
 #include <exception>
 
+#include <string.h>
+
 #include "parser.h"
 using namespace std;
 
@@ -141,8 +143,8 @@ CAstStatement* CParser::statSequence(CAstScope *s)
   //
   // statSequence ::= [ statement { ";" statement } ].
   // statement ::= assignment.
-  // FIRST(statSequence) = { tIdent }
-  // FOLLOW(statSequence) = { tDot }
+  // FIRST(statSequence) = { tIdent, "if", "while", "return" }
+  // FOLLOW(statSequence) = { "else", "end", tDot }
   //
   CAstStatement *head = NULL;
 
@@ -156,16 +158,61 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       CAstStatement *st = NULL;
 
       switch (tt) {
-        // statement ::= assignment
+        
       case tIdent:
 	Consume(tIdent, &t);
+	// statement ::= assignment
 	if (_scanner->Peek().GetType() == tAssign)
+	  { st = assignment(s, t); }
+	// statement ::= subroutineCall
+	else
 	  {
-	    cout << "hej" << endl;
-	    st = assignment(s, t);
+	    // What do we do with the "("?
+	    // if peek == "expression"
+	    // Consume expression
+	    // while peek == ","
+	    // Consume "," and "expression"
+	    // end while
+	    // end if
+	    // What do we do with ")"
 	  }
 	break;
-
+	
+      case tKeyword:
+	Consume(tKeyword, &t);
+	// statement ::= ifStatement
+	if (!t.GetValue().compare("if")) 
+	  {  
+	    // "("
+	    // "expression"
+	    // "then"
+	    // "statSequence"
+	    // if peek == else
+	    // "statSequence"
+	    // "end"
+	  }
+	// statement ::= whileStatement
+	else if (!t.GetValue().compare("while")) 
+	  {  
+	    // "("
+	    // "expression"
+	    // ")"
+	    // "do"
+	    // "statSequence"
+	    // "end"
+	  }
+	// statement ::= returnStatement
+	else if (!t.GetValue().compare("return")) 
+	  {  
+	    // "return"
+	    // if peek == "expression"
+	    // "expression"
+	  }
+	// error
+	else { SetError(_scanner->Peek(), "Keyword { if | while | return } expected."); }
+	
+	break;
+	
       default:
 	SetError(_scanner->Peek(), "statement expected.");
 	break;
@@ -206,6 +253,10 @@ CAstExpression* CParser::expression(CAstScope* s)
   //
   // expression ::= simpleexpr [ relOp simpleexpression ].
   //
+  // FIRST(expression) ::= { "+", "-", FIRST(factor) }
+  // FIRST(factor) ::= { tIdent, tNumber, "true", "false", tChar, tString, "(", subroutineCall, "!" }
+  // FOLLOW(expression) ::= { "]", ")", ",", tDot }
+  // 
   CToken t;
   EOperation relop;
   CAstExpression *left = NULL, *right = NULL;
@@ -230,8 +281,13 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
 {
   //
   // simpleexpr ::= term { termOp term }.
-  //
+  // 
+  // FIRST(simpleexpr) ::= { "+", "-", FIRST(factor) }
+  // FOLLOW(simpleexpr) ::= { relOp, tDot }
+
   CAstExpression *n = NULL;
+
+  // Check for ["+"|"-"]
 
   n = term(s);
 
@@ -339,9 +395,15 @@ CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
   // FIRST(qualident) = { tIdent }
   // FOLLOW(qualident) = { tAssign | tDot }
   
-  //CToken t;
-  //Consume(tIdent, &t);
-  //cout << "hej" << endl;
-  return new CAstStringConstant(t, "hej", s);
-  //CTypeManager::Get()->GetChar()
+  // tIdent will already be comsumed before this function starts (?)
+  // Have to check for { "[" expression "]" }
+
+  
+  // while peek == "["
+  // Consume "["
+  // "expression"
+  // Consume "]"
+  // end while
+
+  return new CAstStringConstant(t, "hej", s); /* ### FIX RETURN ### */
 }
