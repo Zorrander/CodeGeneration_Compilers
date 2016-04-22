@@ -146,15 +146,12 @@ CAstStatement* CParser::statSequence(CAstScope *s)
   // FIRST(statSequence) = { tIdent, "if", "while", "return" }
   // FOLLOW(statSequence) = { "else", "end", tDot }
   //
+
   CAstStatement *head = NULL;
 
   EToken tt = _scanner->Peek().GetType();
   if (!(tt == tDot)) {
     CAstStatement *tail = NULL;
-
-    //CAstStringConstant *hej1;
-    //CAstExpression *hej2;
-    //CToken hejTok = tAssign;
 
     do {
       CToken t;
@@ -171,7 +168,6 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= subroutineCall
 	else
 	  {
-	    CToken t2 = t;
 	    Consume(tLBrak, &t);
 	    /* ### Combine tIdent and expession to CAstSubroutine (?) ### */
 	    if (_scanner->Peek().GetType() == tRBrak)
@@ -190,22 +186,14 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 		//st = new CAstStatCall(); ###
 		Consume(tRBrak, &t);
 	      }
-	    // Consume expression
-	    // while peek == ","
-	    // Consume "," and "expression"
-	    // end while
-	    // end if
-	    // What do we do with ")"
 	  }
 	break;
 	
       case tKeyword:
-	Consume(tKeyword, &t);
-	cout << "Keyword: " << t.GetValue() << endl;
 	// statement ::= ifStatement
-	if (!t.GetValue().compare("if")) 
+	if (!_scanner->Peek().GetValue().compare("if")) 
 	  {  
-	    // "("
+	    Consume(tKeyword, &t);
 	    Consume(tLBrak, &t);
 	    expression(s);
 	    Consume(tRBrak, &t);
@@ -216,59 +204,70 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 		SetError(_scanner->Peek(), "Keyword \"then\" expected");
 		break;
 	      }
-	    
+
 	    statSequence(s);
-	    cout << "First end123123123, keyword: " << t.GetValue() << endl;
-	    Consume(tKeyword, &t);
-	    if (!t.GetValue().compare("end"))
+	    if (!_scanner->Peek().GetValue().compare("else"))
+		{
+		  Consume(tKeyword, &t);
+		  statSequence(s);
+		}
+	    if (!_scanner->Peek().GetValue().compare("end"))
 	      {
-		// ### ifStat ###
-		cout << "First end, keyword: " << t.GetValue() << endl;
+		Consume(tKeyword, &t);
 		break;
 	      }
-	    else if (!t.GetValue().compare("else"))
+	    
+	    SetError(_scanner->Peek(), "expected \'end\'");
+	    break;
+	  }
+	
+	// statement ::= whileStatement
+	else if (!_scanner->Peek().GetValue().compare("while")) 
+	  {  
+	    Consume(tKeyword, &t);
+	    Consume(tLBrak, &t);
+	    expression(s);
+	    Consume(tRBrak, &t);
+
+	    if (_scanner->Peek().GetValue().compare("do"))
 	      {
-		statSequence(s);
-		Consume(tKeyword, &t);
-		if (!t.GetValue().compare("end"))
-		  {
-		    // ### Return ifStat ###
-		    cout << "Second  end, keyword: " << t.GetValue() << endl;
-		    break;
-		  }
+		SetError(_scanner->Peek(), "expected \'do\'");
+		break;
 	      }
 
-	    SetError(_scanner->Peek(), "Keyword \"end or else\"");
-	    
-	    // "expression"
-	    // "then"
-	    // "statSequence"
-	    // if peek == else
-	    // "statSequence"
-	    // "end"
-	  }
-	// statement ::= whileStatement
-	else if (!t.GetValue().compare("while")) 
-	  {  
-	    // "("
-	    // "expression"
-	    // ")"
-	    // "do"
-	    // "statSequence"
-	    // "end"
+	    Consume(tKeyword, &t);
+	    statSequence(s);
+	    if (_scanner->Peek().GetValue().compare("end"))
+	      {
+		SetError(_scanner->Peek(), "expected \'do\'");
+		break;
+	      }
+
+	    Consume(tKeyword, &t);
+	    break;
 	  }
 	// statement ::= returnStatement
-	else if (!t.GetValue().compare("return")) 
+	else if (!_scanner->Peek().GetValue().compare("return")) 
 	  {  
-	    // "return"
-	    // if peek == "expression"
-	    // "expression"
+	    Consume(tKeyword, &t);
+	    if (_scanner->Peek().GetType() != tSemicolon)
+	      {
+		expression(s);
+	      }
+	    break;
 	  }
-	// error
 	
 	// ### else if peek == end return, since end is in follow of statSequence. ###
-	
-	else { SetError(_scanner->Peek(), "Got \"" + t.GetValue() + "\", expected keyword { if | while | return } expected." ); }
+	else if(!_scanner->Peek().GetValue().compare("else"))
+	  {
+	    return head; // ### Don't know what is correct to return here ###
+	  }
+	else if (!_scanner->Peek().GetValue().compare("end"))
+	  {
+	    return head; // ### Don't know what is correct to return here ###
+	  }
+
+	else { SetError(_scanner->Peek(), "Got \'" + t.GetValue() + "\', expected keyword { if | while | return | else | end } expected." ); }
 	break;
 	
       default:
@@ -276,9 +275,9 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	break;
       }
 
-      //assert(st != NULL);
+      //assert(st != NULL); // ### Need to work
       if (head == NULL) head = st;
-      //else tail->SetNext(st);
+      //else tail->SetNext(st); // ### Need to work
       tail = st;
 
       
@@ -438,7 +437,7 @@ CAstConstant* CParser::number(void)
   CToken t;
 
   Consume(tNumber, &t);
-
+  
   errno = 0;
   long long v = strtoll(t.GetValue().c_str(), NULL, 10);
   if (errno != 0) SetError(t, "invalid number.");
