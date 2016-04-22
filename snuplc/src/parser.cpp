@@ -424,11 +424,12 @@ CAstExpression* CParser::factor(CAstScope *s)
   CAstExpression *unary = NULL, *n = NULL;
 
   switch (tt) {
-    // factor ::= number
+    // factor ::= qualident
   case tIdent:
-    // add code for qualident
+    Consume(tIdent, &t);
+    n = qualident(s, t);
     break;
-    
+    // factor ::= number
   case tNumber:
     n = number();
     break;
