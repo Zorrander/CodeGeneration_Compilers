@@ -167,14 +167,11 @@ CAstStatement* CParser::statSequence(CAstScope *s)
         
       case tIdent:
 	Consume(tIdent, &t);
-	// statement ::= assignment
-	if (_scanner->Peek().GetType() == tAssign)
-	  { st = assignment(s, t); }
 	// statement ::= subroutineCall
-	else
+	if (_scanner->Peek().GetType() == tLBrak)
 	  {
 	    Consume(tLBrak, &t);
-	    /* ### Combine tIdent and expession to CAstSubroutine (?) ### */
+	    // ### Combine tIdent and expession to CAstSubroutine (?) ### //
 	    if (_scanner->Peek().GetType() == tRBrak)
 	      {
 		Consume(tRBrak, &t);
@@ -192,8 +189,14 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 		Consume(tRBrak, &t);
 	      }
 	  }
+	// statement ::= qualident
+	else
+	  {
+	    cout << "Assignment" << endl;
+	    st = assignment(s, t);
+	  }
 	break;
-	
+        
       case tKeyword:
 	// statement ::= ifStatement
 	if (!_scanner->Peek().GetValue().compare("if")) 
@@ -413,7 +416,7 @@ CAstExpression* CParser::factor(CAstScope *s)
   //
   // factor ::= number | "(" expression ")"
   //
-  // FIRST(factor) = { tNumber, tLBrak }
+  // FIRST(factor) = { FIRST(qualident) = tIdent , tNumber, tKeyword (bool), char, string, tLBrak, subRoutine, "!" }
   //
 
   CToken t;
@@ -422,6 +425,10 @@ CAstExpression* CParser::factor(CAstScope *s)
 
   switch (tt) {
     // factor ::= number
+  case tIdent:
+    // add code for qualident
+    break;
+    
   case tNumber:
     n = number();
     break;
@@ -475,10 +482,16 @@ CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
 
   
   // while peek == "["
+  while (_scanner->Peek().GetType() == tLSqBrak)
+    {
   // Consume "["
+      Consume(tLSqBrak, &t);
   // "expression"
+      expression(s);
   // Consume "]"
+      Consume(tRSqBrak, &t);
   // end while
+    }
 
   return new CAstStringConstant(t, "hej", s); /* ### FIX RETURN ### */
 }
