@@ -146,6 +146,8 @@ CAstStatement* CParser::statSequence(CAstScope *s)
   // FIRST(statSequence) = { tIdent, "if", "while", "return" }
   // FOLLOW(statSequence) = { "else", "end", tDot }
   //
+  bool isFollow;
+  bool noColon;
 
   CAstStatement *head = NULL;
 
@@ -157,6 +159,9 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       CToken t;
       EToken tt = _scanner->Peek().GetType();
       CAstStatement *st = NULL;
+      
+      isFollow = false;
+      noColon = false;
       
       switch (tt) {
         
@@ -193,6 +198,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= ifStatement
 	if (!_scanner->Peek().GetValue().compare("if")) 
 	  {  
+	    noColon = true;
 	    Consume(tKeyword, &t);
 	    Consume(tLBrak, &t);
 	    expression(s);
@@ -224,6 +230,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= whileStatement
 	else if (!_scanner->Peek().GetValue().compare("while")) 
 	  {  
+	    noColon = true;
 	    Consume(tKeyword, &t);
 	    Consume(tLBrak, &t);
 	    expression(s);
@@ -254,17 +261,22 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	      {
 		expression(s);
 	      }
+	    
 	    break;
 	  }
 	
 	// ### else if peek == end return, since end is in follow of statSequence. ###
 	else if(!_scanner->Peek().GetValue().compare("else"))
 	  {
-	    return head; // ### Don't know what is correct to return here ###
+	    isFollow = true;
+	    break;
+	    //return head; // ### Don't know what is correct to return here ###
 	  }
 	else if (!_scanner->Peek().GetValue().compare("end"))
 	  {
-	    return head; // ### Don't know what is correct to return here ###
+	    isFollow = true;
+	    break;
+	    //return head; // ### Don't know what is correct to return here ###
 	  }
 
 	else { SetError(_scanner->Peek(), "Got \'" + t.GetValue() + "\', expected keyword { if | while | return | else | end } expected." ); }
@@ -285,10 +297,14 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       tt = _scanner->Peek().GetType();
       if (tt == tDot) break;
 
-      Consume(tSemicolon);
+      cout << "noColon = " << noColon << endl;
+
+      if (isFollow) { break; }
+      else if (noColon) {  }
+      else { Consume(tSemicolon); }
     } while (!_abort);
   }
-
+  cout << "return head " << endl;
   return head;
 }
 
