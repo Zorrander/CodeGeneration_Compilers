@@ -421,6 +421,7 @@ CAstExpression* CParser::factor(CAstScope *s)
 
   CToken t;
   EToken tt = _scanner->Peek().GetType();
+  string str = _scanner->Peek().GetValue();
   CAstExpression *unary = NULL, *n = NULL;
 
   switch (tt) {
@@ -433,7 +434,21 @@ CAstExpression* CParser::factor(CAstScope *s)
   case tNumber:
     n = number();
     break;
-
+    // factor ::= bool
+  case tKeyword:
+    if (!str.compare("true"))
+      {
+	Consume(tKeyword, &t); // ### Need return
+      }
+    else if (!str.compare("false"))
+      {	
+	Consume(tKeyword, &t); // ### Need return
+      }
+    else
+      {
+	SetError(_scanner->Peek(), "expected 'true/false'");
+      }
+    break;
     // factor ::= "(" expression ")"
   case tLBrak:
     Consume(tLBrak);
