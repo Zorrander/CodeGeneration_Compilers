@@ -121,6 +121,7 @@ void CParser::InitSymbolTable(CSymtab *s)
   // TODO: add predefined functions here
 }
 
+/*
 CAstModule* CParser::module(void)
 {
   //
@@ -135,6 +136,82 @@ CAstModule* CParser::module(void)
 
   m->SetStatementSequence(statseq);
 
+  return m;
+}
+*/
+
+CAstModule* CParser::module(void)
+{
+  //
+  // module ::= "module" ident ";" varDeclaration { subroutineDecl } "begin" statSequence "end" ident ".".
+  //
+  CToken dummy;
+  CAstModule *m = new CAstModule(dummy, "placeholder");
+  CAstStatement *statseq = NULL;
+  
+  CToken t;
+  CToken moduleName;
+
+  if (_scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("module")){
+    Consume(tKeyword, &t);
+
+    if(_scanner->Peek().GetType() == tIdent){
+      Consume(tIdent, &moduleName);
+
+      if(_scanner->Peek().GetType() == tSemicolon){
+	Consume(tSemicolon, &t) ;      
+
+	// varDeclaration
+
+	//varDeclaration(s) ; 
+	varDeclaration() ;
+	
+	//Optional subroutineDecl
+	string str = _scanner->Peek().GetValue();
+	while (!str.compare("procedure") || !str.compare("function"))
+	  {
+	    //subRoutineDecl(s) ;
+	    str = _scanner->Peek().GetValue();
+	  }
+	//"begin"
+	if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("begin") ){
+	  
+	 Consume(tKeyword, &t) ; 
+	 //statSequence
+
+         statseq = statSequence(m);
+               
+         m->SetStatementSequence(statseq);
+
+	 //"end" ident "."
+	 if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("end") ){
+	   Consume(tKeyword, &t) ;
+	   Consume(tIdent, &t) ;
+	   if (moduleName.GetValue().compare(t.GetValue()))
+	     {
+	       SetError(_scanner->Peek(), "module declaration and end did not match.");
+	     }
+
+	   Consume(tDot, &t) ; 
+	 }
+	}
+	else {
+	  SetError(_scanner->Peek(), "expected keyword \"begin\"");
+	}
+      }
+      else{
+	SetError(_scanner->Peek(), "expected \";\"");
+      }
+    }
+    else{
+      SetError(_scanner->Peek(), "expected tIdent");
+    }
+  }
+  else {
+      SetError(_scanner->Peek(), "first word should be \"module\"");
+  }
+
+  //maybe do verifications before returning m in case it's not assigned 
   return m;
 }
 
@@ -510,4 +587,80 @@ CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
     }
 
   return new CAstStringConstant(t, "hej", s); /* ### FIX RETURN ### */
+}
+
+void CParser::varDeclaration(){
+
+  CToken t ;
+ 
+  //varDeclaration ::= "var" varDeclSequence ";"
+  if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("var")){
+    Consume(tKeyword, &t);
+    varDeclSequence(); 
+  }
+  else {
+    SetError(_scanner->Peek(), "var declaration expected. It should start with \"var\"");
+  }
+}
+
+void CParser::varDeclSequence(){
+  CToken t ;
+
+  //varDeclSequence ::= varDecl { ";" varDecl }
+  varDecl() ;
+  Consume(tSemicolon, &t);
+  string str = _scanner->Peek().GetValue();
+  while (str.compare("procedure") || str.compare("function")){
+    
+    varDecl() ; 
+    
+    Consume(tSemicolon, &t);
+    str = _scanner->Peek().GetValue();
+    cout << _scanner->Peek().GetValue() << endl;
+  }
+  cout << "hej" << endl;
+}
+
+void CParser::varDecl(){
+
+  EToken nextToken ;
+  CToken t;
+  /*
+    varDecl ::= ident { "," ident } ":" type 
+ 
+    type = basetype | type "[" [number] "]"
+  */
+  Consume(tIdent, &t) ;
+  while (_scanner->Peek().GetType() == tComma){
+    Consume(tComma, &t) ; 
+    Consume(tIdent, &t) ; 
+  }
+
+  Consume(tColon, &t) ;
+  
+  nextToken = _scanner->Peek().GetType() ;
+
+  switch(nextToken){
+
+    // type ::= basetype
+  case tKeyword :
+    if(!_scanner->Peek().GetValue().compare("integer") || !_scanner->Peek().GetValue().compare("boolean") || !_scanner->Peek().GetValue().compare("char")){
+      Consume(tKeyword, &t);
+    }
+    else {
+      SetError(_scanner->Peek(), "not a basetype");
+    }
+    break ;
+
+    // type ::= type "[" [number] "]"
+  case tString :
+ 
+    if(!_scanner->Peek().GetValue().compare("type")){
+      Consume(tString, &t) ;
+      Consume(tLSqBrak, &t);
+      Consume(tNumber, &t) ;
+      Consume(tRSqBrak, &t);      
+    }
+    break ;
+  }
 }

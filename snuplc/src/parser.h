@@ -109,6 +109,9 @@ class CParser {
     CAstConstant*     number(void);
     CAstStringConstant*     qualident(CAstScope* s, CToken t);
 
+    void              varDeclaration();
+    void              varDeclSequence();
+    void              varDecl();
     /// @}
 
 
