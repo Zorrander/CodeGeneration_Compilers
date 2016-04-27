@@ -361,14 +361,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	SetError(_scanner->Peek(), "statement expected.");
 	break;
       }
-
-      assert(st != NULL); // ### Need to work
-      if (head == NULL) head = st;
-      else tail->SetNext(st); // ### Need to work
-      tail = st;
-
       
-
       tt = _scanner->Peek().GetType();
       if (tt == tDot) break;
 
@@ -378,12 +371,14 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	  //cout << "isFollow: " << _scanner->Peek().GetValue() << endl;
 	  isFollow = true;
 	}
-      //cout << "token: " << _scanner->Peek().GetValue() << endl;
-      //cout << "noColon = " << noColon << endl;
 
       if (isFollow) { break; }
       else 
 	{ 
+	  assert(st != NULL); // ### Need to work
+	  if (head == NULL) head = st;
+	  else tail->SetNext(st); // ### Need to work
+	  tail = st;
 	  Consume(tSemicolon); 
 	}
     } while (!_abort);
@@ -870,8 +865,8 @@ CAstScope* CParser::subroutineDecl(CAstScope* s){
       functionDecl(s);
     }
   
-  subroutineBody();
-  if (!_scanner->Peek().GetValue().compare(t.GetValue()))
+  subroutineBody(sr);
+  if (!_scanner->Peek().GetValue().compare(tName.GetValue()))
     {
       Consume(tIdent, &t);
       Consume(tSemicolon, &t);
@@ -880,6 +875,7 @@ CAstScope* CParser::subroutineDecl(CAstScope* s){
     {
       SetError(_scanner->Peek(), "end of procedure/function does not match declaration.");
     }
+  cout << "hejhej!!" << endl;
 }
 
 CSymProc* CParser::procedureDecl(CAstScope* s){
@@ -940,19 +936,18 @@ void CParser::formalParam(CAstScope* s){
   cout << "symbol table: \n" << st << endl;
 }
 
-void CParser::subroutineBody(){
+void CParser::subroutineBody(CAstScope* s){
   //subroutineBody ::= varDeclaration "begin" statSequence "end" 
   CToken t ;
   // ###
-  CToken dummy;
-  CAstModule *m = new CAstModule(dummy, "placeholder");
+  //CToken dummy;
+  //CAstModule *m = new CAstModule(dummy, "placeholder");
 
-  varDeclaration(m) ; 
+  varDeclaration(s); 
   if (_scanner->Peek().GetType()  == tKeyword && !_scanner->Peek().GetValue().compare("begin")){
-    Consume(tKeyword, &t) ;
+    Consume(tKeyword, &t);
     
-    // ### dummy scope
-    statSequence(m) ; 
+    statSequence(s); 
     if (_scanner->Peek().GetType()  == tKeyword && !_scanner->Peek().GetValue().compare("end")){
       Consume(tKeyword, &t);
     }else{
@@ -961,5 +956,5 @@ void CParser::subroutineBody(){
   }else {
        SetError(_scanner->Peek(), "keyword \"end\" expected");
   }
-  
+  cout << "end of subroutbody" << endl;
 }

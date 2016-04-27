@@ -121,7 +121,7 @@ class CParser {
     CSymProc*         procedureDecl(CAstScope* s);
     void functionDecl(CAstScope* s);
     void formalParam(CAstScope* s);
-    void subroutineBody();
+    void subroutineBody(CAstScope* s);
     /// @}
 
 
