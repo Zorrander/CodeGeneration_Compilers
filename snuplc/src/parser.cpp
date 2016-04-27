@@ -163,9 +163,7 @@ CAstModule* CParser::module(void)
 	Consume(tSemicolon, &t) ;      
 
 	// varDeclaration
-
-	//varDeclaration(s) ; 
-	varDeclaration() ;
+	varDeclaration(m);
 	
 	//Optional subroutineDecl
 	string str = _scanner->Peek().GetValue();
@@ -751,7 +749,7 @@ void CParser::subroutineCall()
   cout << "end subR" << endl;
 }
 
-void CParser::varDeclaration(){
+void CParser::varDeclaration(CAstScope* s){
 
   //
   // FOLLOW(varDeclaration) = { "begin", "procedure", "function" }
@@ -763,18 +761,18 @@ void CParser::varDeclaration(){
   //varDeclaration ::= "var" varDeclSequence ";"
   if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("var")){
     Consume(tKeyword, &t);
-    varDeclSequence(); 
+    varDeclSequence(s); 
   }
   else {
     //SetError(_scanner->Peek(), "var declaration expected. It should start with \"var\"");
   }
 }
 
-void CParser::varDeclSequence(){
+void CParser::varDeclSequence(CAstScope* s){
   CToken t ;
 
   //varDeclSequence ::= varDecl { ";" varDecl }
-  varDecl() ;
+  varDecl(s) ;
   if (_scanner->Peek().GetType() != tRBrak)
       {
 	Consume(tSemicolon, &t);
@@ -783,7 +781,7 @@ void CParser::varDeclSequence(){
   
   while ( str.compare("procedure") && str.compare("function") && (_scanner->Peek().GetType() != tRBrak) && str.compare("begin") ){
     
-    varDecl() ; 
+    varDecl(s) ; 
     if (_scanner->Peek().GetType() != tRBrak)
       {
 	Consume(tSemicolon, &t);
@@ -794,48 +792,70 @@ void CParser::varDeclSequence(){
     
 }
 
-void CParser::varDecl(){
+const CType* CParser::varDecl(CAstScope* s){
 
-  EToken nextToken ;
-  CToken t;
+  EToken nextToken;
+  CToken t, val, baseType;
+  string str;
+  const CType *ct;
   /*
     varDecl ::= ident { "," ident } ":" type 
  
     type = basetype | type "[" [number] "]"
   */
-  Consume(tIdent, &t) ;
-  while (_scanner->Peek().GetType() == tComma){
-    Consume(tComma, &t) ; 
-    Consume(tIdent, &t) ; 
+  Consume(tIdent, &t);
+  cout << "tIdent: " << t.GetValue() << endl;
+  if (_scanner->Peek().GetType() == tComma){
+    Consume(tComma); 
+    ct = varDecl(s);
+    //Consume(tIdent, &t) ; 
   }
-
-  Consume(tColon, &t) ;
+  else
+    {
+      Consume(tColon);
+    }
   
-  nextToken = _scanner->Peek().GetType() ;
+  cout << "hej" << endl;
+  nextToken = _scanner->Peek().GetType();
+  str = _scanner->Peek().GetValue();
 
-  switch(nextToken){
-
-    // type ::= basetype
-  case tKeyword :
-    if(!_scanner->Peek().GetValue().compare("integer") || !_scanner->Peek().GetValue().compare("boolean") || !_scanner->Peek().GetValue().compare("char")){
-      Consume(tKeyword, &t);
-      
-      // type ::= type "[" [number] "]"
-      while (_scanner->Peek().GetType() == tLSqBrak)
+  if (nextToken == tKeyword)
+    {
+      // type ::= basetype
+      if(!str.compare("integer") || !str.compare("boolean") || !str.compare("char"))
 	{
-	  Consume(tLSqBrak, &t);
-	  if (_scanner->Peek().GetType() == tNumber)
+	  Consume(tKeyword, &baseType);
+	  
+	  if (!str.compare("integer"))
+	    { ct = CTypeManager::Get()->GetInt(); }
+	  
+	  if (!str.compare("character"))
+	    { ct = CTypeManager::Get()->GetChar(); }
+	  
+	  if (!str.compare("boolean"))
+	    { ct = CTypeManager::Get()->GetBool(); }
+	  
+	  // type ::= type "[" [number] "]"
+	  while (_scanner->Peek().GetType() == tLSqBrak)
 	    {
-	      Consume(tNumber, &t);
+	      Consume(tLSqBrak);
+	      if (_scanner->Peek().GetType() == tNumber)
+		{
+		  Consume(tNumber, &val);
+		}
+	      Consume(tRSqBrak);
+	      //const CArrayType* CTypeManager::GetArray(int nelem, const CType *innertype)
+	      ct = new CArrayType(stoi(val.GetValue()), ct);
 	    }
-	  Consume(tRSqBrak, &t); 
 	}
+      else {
+	SetError(_scanner->Peek(), "not a regular type.");
+      }
     }
-    else {
-      SetError(_scanner->Peek(), "not a regular type.");
-    }
-    break ;
-  }
+  cout << "before createvar" << t.GetValue() << endl;
+  //s->CreateVar(t.GetValue(), CTypeManager::Get()->GetInt());
+  s->CreateVar(t.GetValue(), ct);
+  return ct;
 }
 
 void CParser::subroutineDecl(){
@@ -905,7 +925,9 @@ void CParser::functionDecl(){
 
  void CParser::formalParam(){
   // formalParam ::= "(" [varDeclSequence] ")"
-  CToken t ; 
+   CToken dummy;
+   CAstModule *m = new CAstModule(dummy, "dummy fp");
+   CToken t ; 
 
   Consume(tLBrak, &t) ; 
   if(_scanner->Peek().GetType() == tRBrak)
@@ -914,7 +936,7 @@ void CParser::functionDecl(){
     }
   else
     {
-      varDeclSequence() ;
+      varDeclSequence(m) ;
       Consume (tRBrak, &t) ;
     }
 }
@@ -926,7 +948,7 @@ void CParser::subroutineBody(){
   CToken dummy;
   CAstModule *m = new CAstModule(dummy, "placeholder");
 
-  varDeclaration() ; 
+  varDeclaration(m) ; 
   if (_scanner->Peek().GetType()  == tKeyword && !_scanner->Peek().GetValue().compare("begin")){
     Consume(tKeyword, &t) ;
     
