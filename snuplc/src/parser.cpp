@@ -146,7 +146,7 @@ CAstModule* CParser::module(void)
   // module ::= "module" ident ";" varDeclaration { subroutineDecl } "begin" statSequence "end" ident ".".
   //
   CToken dummy;
-  CAstModule *m = new CAstModule(dummy, "placeholder");
+  CAstModule *m; // = new CAstModule(dummy, "placeholder");
   CAstStatement *statseq = NULL;
   
   CToken t;
@@ -157,7 +157,8 @@ CAstModule* CParser::module(void)
 
     if(_scanner->Peek().GetType() == tIdent){
       Consume(tIdent, &moduleName);
-
+      m = new CAstModule(t, moduleName.GetValue());
+      
       if(_scanner->Peek().GetType() == tSemicolon){
 	Consume(tSemicolon, &t) ;      
 
@@ -208,10 +209,10 @@ CAstModule* CParser::module(void)
     }
   }
   else {
-      SetError(_scanner->Peek(), "first word should be \"module\"");
+      SetError(_scanner->Peek(), "first keyword should be \"module\"");
   }
 
-  //maybe do verifications before returning m in case it's not assigned 
+  // ### maybe do verifications before returning m in case it's not assigned 
   return m;
 }
 
@@ -473,10 +474,12 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
   // FOLLOW(simpleexpr) ::= { relOp, tDot }
 
   CAstExpression *n = NULL;
-
-  CToken t;
   CAstExpression *l = n, *r;
+  CToken t;
   
+  string str;
+  
+  // Deals with expression starting with ["+"|"-"]
   if ( !_scanner->Peek().GetValue().compare("+") || !_scanner->Peek().GetValue().compare("-") )
     {
       Consume(tTermOp, &t);
@@ -488,6 +491,8 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
       n = term(s);
     }
   
+  // While loop for casting "long" expression, ex : a = 3 + 4 - 8 ...
+  // Becomes a chain of BinaryOp
   while (_scanner->Peek().GetType() == tTermOp) {
     
     l = n;
@@ -495,7 +500,20 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
     Consume(tTermOp, &t);
     r = term(s);
 
-    n = new CAstBinaryOp(t, t.GetValue() == "+" ? opAdd : opSub, l, r);
+    str = t.GetValue();
+    if ( !str.compare("+") )
+      {
+	n = new CAstBinaryOp(t, opAdd, l, r);
+      }
+    else if ( !str.compare("-") )
+      {
+	n = new CAstBinaryOp(t, opSub, l, r);
+      }
+    else
+      {
+	n = new CAstBinaryOp(t, opOr, l, r);
+      }
+    //n = new CAstBinaryOp(t, t.GetValue() == "+" ? opAdd : opSub, l, r);
   }
 
 
@@ -509,6 +527,8 @@ CAstExpression* CParser::term(CAstScope *s)
   //
   CAstExpression *n = NULL;
 
+  string str;
+
   n = factor(s);
 
   EToken tt = _scanner->Peek().GetType();
@@ -520,7 +540,21 @@ CAstExpression* CParser::term(CAstScope *s)
     Consume(tFactOp, &t);
     r = factor(s);
 
-    n = new CAstBinaryOp(t, t.GetValue() == "*" ? opMul : opDiv, l, r);
+    str = t.GetValue();
+    if ( !str.compare("*") )
+      {
+	n = new CAstBinaryOp(t, opMul, l, r);
+      }
+    else if ( !str.compare("-") )
+      {
+	n = new CAstBinaryOp(t, opDiv, l, r);
+      }
+    else
+      {
+	n = new CAstBinaryOp(t, opAnd, l, r);
+      }
+    
+    //n = new CAstBinaryOp(t, t.GetValue() == "*" ? opMul : opDiv, l, r);
 
     tt = _scanner->Peek().GetType();
   }
@@ -551,7 +585,6 @@ CAstExpression* CParser::factor(CAstScope *s)
       }
     else
       {
-	cout << "t: " << t.GetValue() << endl;
 	n = qualident(s, t);
       }
     break;
@@ -561,19 +594,9 @@ CAstExpression* CParser::factor(CAstScope *s)
     break;
     // factor ::= bool
   case tKeyword:
-    if (!str.compare("true"))
-      {
-	Consume(tKeyword, &t); // ### Need return
-      }
-    else if (!str.compare("false"))
-      {	
-	Consume(tKeyword, &t); // ### Need return
-      }
-    else
-      {
-	SetError(_scanner->Peek(), "expected 'true/false'");
-      }
+    n = boolean();
     break;
+    
     // factor ::= "(" expression ")"
   case tLBrak:
     Consume(tLBrak, &t);
@@ -581,21 +604,23 @@ CAstExpression* CParser::factor(CAstScope *s)
     Consume(tRBrak, &t);
     break;
 
-  case tNot://factor ::= !factor
-    Consume(tNot, &t) ;
-    //what if it's the second "!" ?
-    n = factor(s) ;
+  case tNot:
+    //factor ::= !factor
+    Consume(tNot, &t);
+    unary = factor(s);
+    n = new CAstUnaryOp(t, opNot, unary);
     break ;
 
   case tChar:
     // factor ::= char 
-    Consume(tChar, &t) ; 
-    break ;
+    n = character();
+    break;
 
     //factor ::= string 
   case tString:
     // n = new CAstConstant 
-    Consume(tString, &t) ; 
+    Consume(tString, &t);
+    n = new CAstStringConstant(t, t.GetValue(), s);
     break ;
 
   default:
@@ -604,11 +629,11 @@ CAstExpression* CParser::factor(CAstScope *s)
     break;
   }
 
-  //return n;
-  //cout << "test1" << endl;
-  CAstStringConstant *test = new CAstStringConstant(t, "hej", s);
-  //cout << "test2" << endl;
-  return test;
+  return n;
+  
+  //CAstStringConstant *test = new CAstStringConstant(t, "hej", s);
+  
+  //return test;
   //return new CAstStringConstant(t, "hej", s);
 }
 
@@ -631,6 +656,44 @@ CAstConstant* CParser::number(void)
   return new CAstConstant(t, CTypeManager::Get()->GetInt(), v);
 }
 
+CAstConstant* CParser::character(void)
+{
+  //
+  // character
+  //
+
+  CToken t;
+
+  Consume(tChar, &t);
+  
+  long long v = strtoll(t.GetValue().c_str(), NULL, 10);
+  return new CAstConstant(t, CTypeManager::Get()->GetChar(), v);
+}
+
+CAstConstant* CParser::boolean(void)
+{
+  
+  CToken t;
+
+  Consume(tKeyword, &t);
+
+  long long v;
+  if (!t.GetValue().compare("true"))
+    {
+      v = 1;
+    }
+  else if (!t.GetValue().compare("false"))
+    {
+      v = 0;
+    }
+  else
+    {
+      SetError(t, "expected boolean (true/false)");
+    }
+  // ### Is it correct to return bool as 1 || 0 ???
+  return new CAstConstant(t, CTypeManager::Get()->GetBool(), v);
+}
+
 CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
 {
   //
@@ -643,20 +706,21 @@ CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
   // tIdent will already be comsumed before this function starts (?)
   // Have to check for { "[" expression "]" }
 
+  const string str = t.GetValue();
+
+  CAstExpression* n, *r;
   
-  // while peek == "["
   while (_scanner->Peek().GetType() == tLSqBrak)
     {
-  // Consume "["
-      Consume(tLSqBrak, &t);
-  // "expression"
-      expression(s);
-  // Consume "]"
-      Consume(tRSqBrak, &t);
-  // end while
+      Consume(tLSqBrak);
+      r = expression(s);
+      Consume(tRSqBrak);
+      //n = new CAstConstant(t, CTypeManager::Get()->GetArray(), str);
     }
-
-  return new CAstStringConstant(t, "hej", s); /* ### FIX RETURN ### */
+  
+  return new CAstStringConstant(t, str, s); /* ### FIX RETURN ### */
+  //return new CAstConstant(t, CTypeManager::Get()->GetArray(), str);
+  //return new CAstStringConstant(t, CTypeManager::Get()->GetString(), s);
 }
 
 void CParser::subroutineCall()
