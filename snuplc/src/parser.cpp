@@ -827,46 +827,29 @@ const CType* CParser::varDecl(CAstScope* s){
   return ct;
 }
 
-CAstScope* CParser::subroutineDecl(CAstScope* s){
+void CParser::subroutineDecl(CAstScope* s){
+  //
   //subroutineDecl ::= (procedureDecl | functionDecl) subroutineBody ident ";"
+  //
   CToken t, tName; 
   EToken tt = _scanner->Peek().GetType();
   string str = _scanner->Peek().GetValue();
 
-  CSymtab* st = s->GetSymbolTable();
-  cout << "symbol table: \n" << st << endl;
-
   CAstScope *sr;
 
-  cout << "hej subdecl" << endl;
-  
   if (!str.compare("procedure"))
     {
-      Consume(tKeyword, &t);
-      Consume(tIdent, &tName);
-      cout << "hej" << endl;
-      CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
-      
-      
-      
-      sr = new CAstProcedure(t, tName.GetValue(), s, temp );
-      
-            
-      CSymtab* st = sr->GetSymbolTable();
-      cout << "symbol table: \n" << st << endl;
-      
-
-      procedureDecl(sr);
+      sr = procedureDecl(s);
+      subroutineBody(sr);
     } 
   else
     {
-      Consume(tKeyword, &t);
-      Consume(tIdent, &t);
-      functionDecl(s);
+      functionDecl();
+      subroutineBody(sr); // ### I know this does not work, can't have sr there
     }
   
-  subroutineBody(sr);
-  if (!_scanner->Peek().GetValue().compare(tName.GetValue()))
+  
+  if (!_scanner->Peek().GetValue().compare(sr->GetName()))
     {
       Consume(tIdent, &t);
       Consume(tSemicolon, &t);
@@ -875,43 +858,76 @@ CAstScope* CParser::subroutineDecl(CAstScope* s){
     {
       SetError(_scanner->Peek(), "end of procedure/function does not match declaration.");
     }
-  cout << "hejhej!!" << endl;
 }
 
-CSymProc* CParser::procedureDecl(CAstScope* s){
+CAstScope* CParser::procedureDecl(CAstScope* s){
+  //
   //procedureDecl ::= "procedure" ident [formalParam] ";"
-  CToken t ;
-  
-  cout << "hej formdecl" << endl;
+  //
+  CToken t, tName;
+  CAstScope *sr;
+
+  Consume(tKeyword, &t);
+  Consume(tIdent, &tName);
+  // Creates CSymbol for Procedure
+  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
+  // Creates Scope for Procedure
+  sr = new CAstProcedure(t, tName.GetValue(), s, temp);
   
   if(_scanner->Peek().GetType() == tLBrak)
     {
-      formalParam(s);
+      formalParam(sr);
     }
   Consume(tSemicolon, &t);
+  return sr;
 }
 
-void CParser::functionDecl(CAstScope* s){
+CAstExpression* CParser::functionDecl(){
+  //
   //functionDecl ::= "function" ident [formalParam] ":" type ";"
-  CToken t ;
+  //
+  CToken t, tName;
+  CAstExpression *sr;
+  
+  CAstScope *s;
+  
+  Consume(tKeyword, &t);
+  Consume(tIdent, &tName);
+  // Creates CSymbol for FunctionCall, DataType is not set here
+  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
+  // Creates Scope for Procedure
+  sr = new CAstFunctionCall(t, temp);
 
   if (_scanner->Peek().GetType() == tColon)
     {
-      Consume(tColon, &t);
+      Consume(tColon);
     }
   else
     {
-      formalParam(s);
-      Consume(tColon, &t);
+      formalParam(s); // ### Dunno what scope to send to formalParam, if any?
+      Consume(tColon);
     }
   
-  if(!_scanner->Peek().GetValue().compare("integer") || !_scanner->Peek().GetValue().compare("boolean") || !_scanner->Peek().GetValue().compare("char")){
+  string str = _scanner->Peek().GetValue();
+  
+  cout << "after formal" << endl;
+  
+  if(!str.compare("integer") || !str.compare("boolean") || !str.compare("char")){
     Consume(tKeyword, &t);
+    
+    // Set DataType
+    if (!str.compare("integer"))
+      { temp->SetDataType(CTypeManager::Get()->GetInt()); }
+    if (!str.compare("char"))
+      { temp->SetDataType(CTypeManager::Get()->GetChar()); }
+    if (!str.compare("boolean"))
+      { temp->SetDataType(CTypeManager::Get()->GetBool()); }
   }
   else {
     SetError(_scanner->Peek(), "not a basetype");
   }
-  Consume(tSemicolon, &t);
+  Consume(tSemicolon);
+  return sr;
 }
 
 void CParser::formalParam(CAstScope* s){
@@ -922,18 +938,16 @@ void CParser::formalParam(CAstScope* s){
 
   cout << "hej formal" << endl; 
    
-  Consume(tLBrak, &t) ; 
+  Consume(tLBrak, &t); 
   if(_scanner->Peek().GetType() == tRBrak)
     {
-      Consume (tRBrak, &t) ;
+      Consume (tRBrak, &t);
     }
   else
     {
       varDeclSequence(s);
-      Consume (tRBrak, &t) ;
+      Consume (tRBrak, &t);
     }
-  CSymtab* st = s->GetSymbolTable();
-  cout << "symbol table: \n" << st << endl;
 }
 
 void CParser::subroutineBody(CAstScope* s){
