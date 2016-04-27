@@ -239,7 +239,9 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       CAstStatement *st = NULL;
       
       isFollow = false;
-      noColon = false;
+      //noColon = false;
+
+      cout << "Beginning of statsequence, token: " << _scanner->Peek().GetValue() << endl;
       
       switch (tt) {
         
@@ -283,7 +285,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= ifStatement
 	if (!_scanner->Peek().GetValue().compare("if")) 
 	  {  
-	    noColon = true;
+	    //noColon = false;
 	    Consume(tKeyword, &t);
 	    Consume(tLBrak, &t);
 	    expression(s);
@@ -315,7 +317,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= whileStatement
 	else if (!_scanner->Peek().GetValue().compare("while")) 
 	  {  
-	    noColon = true;
+	    //noColon = false;
 	    Consume(tKeyword, &t);
 	    Consume(tLBrak, &t);
 	    expression(s);
@@ -342,9 +344,21 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	else if (!_scanner->Peek().GetValue().compare("return")) 
 	  {  
 	    Consume(tKeyword, &t);
+	    /*
 	    if (_scanner->Peek().GetType() != tSemicolon)
 	      {
 		expression(s);
+	      }
+	    */
+	    cout <<  "return token: " << _scanner->Peek().GetValue() << endl;
+	    if ( _scanner->Peek().GetValue().compare("end") && _scanner->Peek().GetValue().compare("else") )
+	      {
+		cout << "return expr" << endl;
+		expression(s);
+	      }
+	    if (_scanner->Peek().GetType() == tSemicolon)
+	      {
+		SetError(_scanner->Peek(), "do not use semicolon to terminate return.");
 	      }
 	    
 	    break;
@@ -383,14 +397,15 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       if (tt == tDot) break;
 
       // Check if it is last line in a statSequence.
-      if ( !_scanner->Peek().GetValue().compare("end") )
+      if ( !_scanner->Peek().GetValue().compare("end") || !_scanner->Peek().GetValue().compare("else") )
 	{
+	  //cout << "isFollow: " << _scanner->Peek().GetValue() << endl;
 	  isFollow = true;
 	}
+      //cout << "token: " << _scanner->Peek().GetValue() << endl;
       //cout << "noColon = " << noColon << endl;
 
       if (isFollow) { break; }
-      else if (noColon) {  }
       else 
 	{ 
 	  Consume(tSemicolon); 
@@ -459,16 +474,25 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
 
   CAstExpression *n = NULL;
 
-  // Check for ["+"|"-"]
-
-  n = term(s);
-
+  CToken t;
+  CAstExpression *l = n, *r;
+  
+  if ( !_scanner->Peek().GetValue().compare("+") || !_scanner->Peek().GetValue().compare("-") )
+    {
+      Consume(tTermOp, &t);
+      r = term(s);
+      n = new CAstUnaryOp(t, t.GetValue() == "+" ? opPos : opNeg, r);
+    }
+  else
+    {
+      n = term(s);
+    }
+  
   while (_scanner->Peek().GetType() == tTermOp) {
-    CToken t;
-    CAstExpression *l = n, *r;
+    
+    l = n;
 
     Consume(tTermOp, &t);
-
     r = term(s);
 
     n = new CAstBinaryOp(t, t.GetValue() == "+" ? opAdd : opSub, l, r);
@@ -494,7 +518,6 @@ CAstExpression* CParser::term(CAstScope *s)
     CAstExpression *l = n, *r;
 
     Consume(tFactOp, &t);
-
     r = factor(s);
 
     n = new CAstBinaryOp(t, t.GetValue() == "*" ? opMul : opDiv, l, r);
@@ -512,7 +535,6 @@ CAstExpression* CParser::factor(CAstScope *s)
   //
   // FIRST(factor) = { FIRST(qualident) = tIdent , tNumber, tKeyword (bool), char, string, tLBrak, subRoutine, "!" }
   //
-
   CToken t;
   EToken tt = _scanner->Peek().GetType();
   string str = _scanner->Peek().GetValue();
@@ -529,6 +551,7 @@ CAstExpression* CParser::factor(CAstScope *s)
       }
     else
       {
+	cout << "t: " << t.GetValue() << endl;
 	n = qualident(s, t);
       }
     break;
@@ -553,26 +576,26 @@ CAstExpression* CParser::factor(CAstScope *s)
     break;
     // factor ::= "(" expression ")"
   case tLBrak:
-    Consume(tLBrak);
+    Consume(tLBrak, &t);
     n = expression(s);
-    Consume(tRBrak);
+    Consume(tRBrak, &t);
     break;
 
   case tNot://factor ::= !factor
-    Consume(tNot) ;
+    Consume(tNot, &t) ;
     //what if it's the second "!" ?
     n = factor(s) ;
     break ;
 
   case tChar:
     // factor ::= char 
-    Consume(tChar) ; 
+    Consume(tChar, &t) ; 
     break ;
 
     //factor ::= string 
   case tString:
     // n = new CAstConstant 
-    Consume(tString) ; 
+    Consume(tString, &t) ; 
     break ;
 
   default:
@@ -582,7 +605,11 @@ CAstExpression* CParser::factor(CAstScope *s)
   }
 
   //return n;
-  return new CAstStringConstant(t, "hej", s);
+  //cout << "test1" << endl;
+  CAstStringConstant *test = new CAstStringConstant(t, "hej", s);
+  //cout << "test2" << endl;
+  return test;
+  //return new CAstStringConstant(t, "hej", s);
 }
 
 CAstConstant* CParser::number(void)
@@ -634,6 +661,7 @@ CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
 
 void CParser::subroutineCall()
 {
+  cout << "begin SRcall" << endl;
   CToken dummy;
   CAstModule *m = new CAstModule(dummy, "placeholder");
 
@@ -648,6 +676,7 @@ void CParser::subroutineCall()
   else
     {
       expression(m);
+      cout << "first expr " << endl;
       while (_scanner->Peek().GetType() == tComma)
 	{
 	  Consume(tComma, &t);
@@ -655,6 +684,7 @@ void CParser::subroutineCall()
 	}
       Consume(tRBrak, &t);
     }
+  cout << "end subR" << endl;
 }
 
 void CParser::varDeclaration(){
@@ -681,7 +711,10 @@ void CParser::varDeclSequence(){
 
   //varDeclSequence ::= varDecl { ";" varDecl }
   varDecl() ;
-  Consume(tSemicolon, &t);
+  if (_scanner->Peek().GetType() != tRBrak)
+      {
+	Consume(tSemicolon, &t);
+      }
   string str = _scanner->Peek().GetValue();
   
   while ( str.compare("procedure") && str.compare("function") && (_scanner->Peek().GetType() != tRBrak) && str.compare("begin") ){
@@ -694,6 +727,7 @@ void CParser::varDeclSequence(){
     str = _scanner->Peek().GetValue();
     cout << "val: " << str << endl;
   }
+    
 }
 
 void CParser::varDecl(){
@@ -748,22 +782,33 @@ void CParser::subroutineDecl(){
 
   if (!str.compare("procedure"))
     {
-      procedureDecl(); 
+      Consume(tKeyword, &t);
+      Consume(tIdent, &t);
+      procedureDecl();
     } 
   else
     {
+      Consume(tKeyword, &t);
+      Consume(tIdent, &t);
       functionDecl();
     }
+  
   subroutineBody();
-  Consume(tIdent, &t);
-  Consume(tSemicolon, &t);
+  if (!_scanner->Peek().GetValue().compare(t.GetValue()))
+    {
+      Consume(tIdent, &t);
+      Consume(tSemicolon, &t);
+    }
+  else
+    {
+      SetError(_scanner->Peek(), "end of procedure/dunction does not match declaration.");
+    }
 }
 
 void CParser::procedureDecl(){
   //procedureDecl ::= "procedure" ident [formalParam] ";"
   CToken t ;
-  Consume(tKeyword, &t);
-  Consume(tIdent, &t);
+  
   if(_scanner->Peek().GetType() == tLBrak)
     {
       formalParam();
@@ -775,17 +820,23 @@ void CParser::functionDecl(){
   //functionDecl ::= "function" ident [formalParam] ":" type ";"
   CToken t ;
 
-    Consume(tKeyword, &t);
-    Consume(tIdent, &t);
-    formalParam();
-    Consume(tColon, &t);
-    if(!_scanner->Peek().GetValue().compare("integer") || !_scanner->Peek().GetValue().compare("boolean") || !_scanner->Peek().GetValue().compare("char")){
-    Consume(tKeyword, &t);
+  if (_scanner->Peek().GetType() == tColon)
+    {
+      Consume(tColon, &t);
     }
-    else {
-      SetError(_scanner->Peek(), "not a basetype");
+  else
+    {
+      formalParam();
+      Consume(tColon, &t);
     }
-    Consume(tSemicolon, &t);
+  
+  if(!_scanner->Peek().GetValue().compare("integer") || !_scanner->Peek().GetValue().compare("boolean") || !_scanner->Peek().GetValue().compare("char")){
+    Consume(tKeyword, &t);
+  }
+  else {
+    SetError(_scanner->Peek(), "not a basetype");
+  }
+  Consume(tSemicolon, &t);
 }
 
  void CParser::formalParam(){
