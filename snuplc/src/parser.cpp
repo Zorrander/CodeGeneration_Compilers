@@ -836,6 +836,7 @@ void CParser::subroutineDecl(CAstScope* s){
   string str = _scanner->Peek().GetValue();
 
   CAstScope *sr;
+  CAstFunctionCall *ex;
 
   if (!str.compare("procedure"))
     {
@@ -844,12 +845,12 @@ void CParser::subroutineDecl(CAstScope* s){
     } 
   else
     {
-      functionDecl();
-      subroutineBody(sr); // ### I know this does not work, can't have sr there
+      ex = functionDecl(s);
+      subroutineBody(s); // ###
     }
   
-  
-  if (!_scanner->Peek().GetValue().compare(sr->GetName()))
+  str = _scanner->Peek().GetValue();
+  if (!str.compare(sr->GetName()) || !str.compare(ex->GetSymbol()->GetName()))
     {
       Consume(tIdent, &t);
       Consume(tSemicolon, &t);
@@ -882,21 +883,21 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   return sr;
 }
 
-CAstExpression* CParser::functionDecl(){
+CAstFunctionCall* CParser::functionDecl(CAstScope* s){
   //
   //functionDecl ::= "function" ident [formalParam] ":" type ";"
   //
   CToken t, tName;
-  CAstExpression *sr;
+  CAstFunctionCall *ex;
   
-  CAstScope *s;
+  //CAstScope *s;
   
   Consume(tKeyword, &t);
   Consume(tIdent, &tName);
   // Creates CSymbol for FunctionCall, DataType is not set here
   CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
   // Creates Scope for Procedure
-  sr = new CAstFunctionCall(t, temp);
+  ex = new CAstFunctionCall(t, temp);
 
   if (_scanner->Peek().GetType() == tColon)
     {
@@ -909,9 +910,7 @@ CAstExpression* CParser::functionDecl(){
     }
   
   string str = _scanner->Peek().GetValue();
-  
-  cout << "after formal" << endl;
-  
+      
   if(!str.compare("integer") || !str.compare("boolean") || !str.compare("char")){
     Consume(tKeyword, &t);
     
@@ -927,7 +926,7 @@ CAstExpression* CParser::functionDecl(){
     SetError(_scanner->Peek(), "not a basetype");
   }
   Consume(tSemicolon);
-  return sr;
+  return ex;
 }
 
 void CParser::formalParam(CAstScope* s){
@@ -936,8 +935,6 @@ void CParser::formalParam(CAstScope* s){
   //CAstModule *m = new CAstModule(dummy, "dummy fp");
   CToken t ; 
 
-  cout << "hej formal" << endl; 
-   
   Consume(tLBrak, &t); 
   if(_scanner->Peek().GetType() == tRBrak)
     {
@@ -970,5 +967,4 @@ void CParser::subroutineBody(CAstScope* s){
   }else {
        SetError(_scanner->Peek(), "keyword \"end\" expected");
   }
-  cout << "end of subroutbody" << endl;
 }

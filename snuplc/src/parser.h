@@ -117,11 +117,11 @@ class CParser {
     void              varDeclSequence(CAstScope* s);
     const CType*      varDecl(CAstScope* s);
 
-    void              subroutineDecl(CAstScope* s);
-    CAstScope*        procedureDecl(CAstScope* s);
-    CAstExpression*   functionDecl();
-    void              formalParam(CAstScope* s);
-    void              subroutineBody(CAstScope* s);
+    void                subroutineDecl(CAstScope* s);
+    CAstScope*          procedureDecl(CAstScope* s);
+    CAstFunctionCall*   functionDecl(CAstScope* s);
+    void                formalParam(CAstScope* s);
+    void                subroutineBody(CAstScope* s);
     /// @}
 
 
