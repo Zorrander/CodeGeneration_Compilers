@@ -169,7 +169,7 @@ CAstModule* CParser::module(void)
 	string str = _scanner->Peek().GetValue();
 	while ( !str.compare("procedure") || !str.compare("function") )
 	  {
-	    subroutineDecl();
+	    subroutineDecl(m);
 	    str = _scanner->Peek().GetValue();
 	  }
 	//"begin"
@@ -697,7 +697,7 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   const CSymbol* sy = st->FindSymbol(t.GetValue());
   if (sy == NULL)
     { SetError(_scanner->Peek(), "variable not declared in this scope."); }
-  return new CAstDesignator(t, sy);
+  return new CAstDesignator(t, sy); // ### Does not add "{[expression]}" to AST
 }
 
 void CParser::subroutineCall()
@@ -832,23 +832,42 @@ const CType* CParser::varDecl(CAstScope* s){
   return ct;
 }
 
-void CParser::subroutineDecl(){
+CAstScope* CParser::subroutineDecl(CAstScope* s){
   //subroutineDecl ::= (procedureDecl | functionDecl) subroutineBody ident ";"
-  CToken t ; 
+  CToken t, tName; 
   EToken tt = _scanner->Peek().GetType();
   string str = _scanner->Peek().GetValue();
 
+  CSymtab* st = s->GetSymbolTable();
+  cout << "symbol table: \n" << st << endl;
+
+  CAstScope *sr;
+
+  cout << "hej subdecl" << endl;
+  
   if (!str.compare("procedure"))
     {
       Consume(tKeyword, &t);
-      Consume(tIdent, &t);
-      procedureDecl();
+      Consume(tIdent, &tName);
+      cout << "hej" << endl;
+      CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
+      
+      
+      
+      sr = new CAstProcedure(t, tName.GetValue(), s, temp );
+      
+            
+      CSymtab* st = sr->GetSymbolTable();
+      cout << "symbol table: \n" << st << endl;
+      
+
+      procedureDecl(sr);
     } 
   else
     {
       Consume(tKeyword, &t);
       Consume(tIdent, &t);
-      functionDecl();
+      functionDecl(s);
     }
   
   subroutineBody();
@@ -859,22 +878,24 @@ void CParser::subroutineDecl(){
     }
   else
     {
-      SetError(_scanner->Peek(), "end of procedure/dunction does not match declaration.");
+      SetError(_scanner->Peek(), "end of procedure/function does not match declaration.");
     }
 }
 
-void CParser::procedureDecl(){
+CSymProc* CParser::procedureDecl(CAstScope* s){
   //procedureDecl ::= "procedure" ident [formalParam] ";"
   CToken t ;
   
+  cout << "hej formdecl" << endl;
+  
   if(_scanner->Peek().GetType() == tLBrak)
     {
-      formalParam();
+      formalParam(s);
     }
   Consume(tSemicolon, &t);
 }
 
-void CParser::functionDecl(){
+void CParser::functionDecl(CAstScope* s){
   //functionDecl ::= "function" ident [formalParam] ":" type ";"
   CToken t ;
 
@@ -884,7 +905,7 @@ void CParser::functionDecl(){
     }
   else
     {
-      formalParam();
+      formalParam(s);
       Consume(tColon, &t);
     }
   
@@ -897,12 +918,14 @@ void CParser::functionDecl(){
   Consume(tSemicolon, &t);
 }
 
- void CParser::formalParam(){
+void CParser::formalParam(CAstScope* s){
   // formalParam ::= "(" [varDeclSequence] ")"
-   CToken dummy;
-   CAstModule *m = new CAstModule(dummy, "dummy fp");
-   CToken t ; 
+  //CToken dummy;
+  //CAstModule *m = new CAstModule(dummy, "dummy fp");
+  CToken t ; 
 
+  cout << "hej formal" << endl; 
+   
   Consume(tLBrak, &t) ; 
   if(_scanner->Peek().GetType() == tRBrak)
     {
@@ -910,9 +933,11 @@ void CParser::functionDecl(){
     }
   else
     {
-      varDeclSequence(m) ;
+      varDeclSequence(s);
       Consume (tRBrak, &t) ;
     }
+  CSymtab* st = s->GetSymbolTable();
+  cout << "symbol table: \n" << st << endl;
 }
 
 void CParser::subroutineBody(){
