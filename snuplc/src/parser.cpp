@@ -164,7 +164,7 @@ CAstModule* CParser::module(void)
 
 	// varDeclaration
 	varDeclaration(m);
-	
+
 	//Optional subroutineDecl
 	string str = _scanner->Peek().GetValue();
 	while ( !str.compare("procedure") || !str.compare("function") )
@@ -175,9 +175,9 @@ CAstModule* CParser::module(void)
 	//"begin"
 	if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("begin") ){
 	  
-	 Consume(tKeyword, &t) ; 
+	 Consume(tKeyword, &t);
+	 
 	 //statSequence
-
          statseq = statSequence(m);
                
          m->SetStatementSequence(statseq);
@@ -246,36 +246,14 @@ CAstStatement* CParser::statSequence(CAstScope *s)
         
       case tIdent:
 	Consume(tIdent, &t);
-	// statement ::= subroutineCall
 	if (_scanner->Peek().GetType() == tLBrak)
 	  {
-	    /*
-	    Consume(tLBrak, &t);
-	    // ### Combine tIdent and expession to CAstSubroutine (?) ### //
-	    if (_scanner->Peek().GetType() == tRBrak)
-	      {
-		Consume(tRBrak, &t);
-		//st = new CAstStatCall(); ###
-	      }
-	    else
-	      {
-		expression(s);
-		while (_scanner->Peek().GetType() == tComma)
-		  {
-		    Consume(tComma, &t);
-		    expression(s);
-		  }
-		//st = new CAstStatCall(); ###
-		Consume(tRBrak, &t);
-	      }
-	  }
-	    */
-	// statement ::= qualident
+	    // statement ::= subroutineCall
 	    subroutineCall();
 	  }
 	else
 	  {
-	    //cout << "Assignment" << endl;
+	    // statement ::= assignment -> qualident 
 	    st = assignment(s, t);
 	  }
 	break;
@@ -284,7 +262,6 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= ifStatement
 	if (!_scanner->Peek().GetValue().compare("if")) 
 	  {  
-	    //noColon = false;
 	    Consume(tKeyword, &t);
 	    Consume(tLBrak, &t);
 	    expression(s);
@@ -385,9 +362,9 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	break;
       }
 
-      //assert(st != NULL); // ### Need to work
+      assert(st != NULL); // ### Need to work
       if (head == NULL) head = st;
-      //else tail->SetNext(st); // ### Need to work
+      else tail->SetNext(st); // ### Need to work
       tail = st;
 
       
@@ -421,7 +398,7 @@ CAstStatAssign* CParser::assignment(CAstScope *s, CToken t)
   // assignment ::= qualident ":=" expression.
   //
   
-  CAstStringConstant *lhs = qualident(s, t);
+  CAstDesignator *lhs = qualident(s, t);
 
   Consume(tAssign, &t);
 
@@ -692,7 +669,7 @@ CAstConstant* CParser::boolean(void)
   return new CAstConstant(t, CTypeManager::Get()->GetBool(), v);
 }
 
-CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
+CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
 {
   //
   // qualident ::= ident { "[" expression "]" }
@@ -703,7 +680,7 @@ CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
   
   // tIdent will already be comsumed before this function starts (?)
   // Have to check for { "[" expression "]" }
-
+  
   const string str = t.GetValue();
 
   CAstExpression* n, *r;
@@ -713,12 +690,14 @@ CAstStringConstant* CParser::qualident(CAstScope* s, CToken t)
       Consume(tLSqBrak);
       r = expression(s);
       Consume(tRSqBrak);
-      //n = new CAstConstant(t, CTypeManager::Get()->GetArray(), str);
     }
-  
-  return new CAstStringConstant(t, str, s); /* ### FIX RETURN ### */
-  //return new CAstConstant(t, CTypeManager::Get()->GetArray(), str);
-  //return new CAstStringConstant(t, CTypeManager::Get()->GetString(), s);
+
+  CSymtab* st = s->GetSymbolTable();
+
+  const CSymbol* sy = st->FindSymbol(t.GetValue());
+  if (sy == NULL)
+    { SetError(_scanner->Peek(), "variable not declared in this scope."); }
+  return new CAstDesignator(t, sy);
 }
 
 void CParser::subroutineCall()
@@ -798,24 +777,17 @@ const CType* CParser::varDecl(CAstScope* s){
   CToken t, val, baseType;
   string str;
   const CType *ct;
-  /*
-    varDecl ::= ident { "," ident } ":" type 
- 
-    type = basetype | type "[" [number] "]"
-  */
+  
   Consume(tIdent, &t);
-  cout << "tIdent: " << t.GetValue() << endl;
   if (_scanner->Peek().GetType() == tComma){
     Consume(tComma); 
     ct = varDecl(s);
-    //Consume(tIdent, &t) ; 
   }
   else
     {
       Consume(tColon);
     }
   
-  cout << "hej" << endl;
   nextToken = _scanner->Peek().GetType();
   str = _scanner->Peek().GetValue();
 
@@ -826,6 +798,7 @@ const CType* CParser::varDecl(CAstScope* s){
 	{
 	  Consume(tKeyword, &baseType);
 	  
+	  // Set type
 	  if (!str.compare("integer"))
 	    { ct = CTypeManager::Get()->GetInt(); }
 	  
@@ -835,7 +808,7 @@ const CType* CParser::varDecl(CAstScope* s){
 	  if (!str.compare("boolean"))
 	    { ct = CTypeManager::Get()->GetBool(); }
 	  
-	  // type ::= type "[" [number] "]"
+	  // Create array using type and expression
 	  while (_scanner->Peek().GetType() == tLSqBrak)
 	    {
 	      Consume(tLSqBrak);
@@ -844,7 +817,8 @@ const CType* CParser::varDecl(CAstScope* s){
 		  Consume(tNumber, &val);
 		}
 	      Consume(tRSqBrak);
-	      //const CArrayType* CTypeManager::GetArray(int nelem, const CType *innertype)
+	      
+	      // ### Might be something here about allowing empty brackets
 	      ct = new CArrayType(stoi(val.GetValue()), ct);
 	    }
 	}
@@ -852,9 +826,9 @@ const CType* CParser::varDecl(CAstScope* s){
 	SetError(_scanner->Peek(), "not a regular type.");
       }
     }
-  cout << "before createvar" << t.GetValue() << endl;
-  //s->CreateVar(t.GetValue(), CTypeManager::Get()->GetInt());
-  s->CreateVar(t.GetValue(), ct);
+
+  //cout << "Createvar, identifier: " << t.GetValue() << ", type: " << ct <<  endl;
+  s->GetSymbolTable()->AddSymbol( s->CreateVar(t.GetValue(), ct) );
   return ct;
 }
 

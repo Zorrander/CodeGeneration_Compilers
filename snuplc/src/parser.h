@@ -107,12 +107,15 @@ class CParser {
     CAstExpression*   factor(CAstScope *s);
 
     CAstConstant*     number(void);
-    CAstStringConstant*     qualident(CAstScope* s, CToken t);
+    CAstConstant*     character(void);
+    CAstConstant*     boolean(void);
+    
+    CAstDesignator*   qualident(CAstScope* s, CToken t);
     void subroutineCall();
     
-    void              varDeclaration();
-    void              varDeclSequence();
-    void              varDecl();
+    void              varDeclaration(CAstScope* s);
+    void              varDeclSequence(CAstScope* s);
+    const CType*      varDecl(CAstScope* s);
 
     void subroutineDecl();
     void procedureDecl();
