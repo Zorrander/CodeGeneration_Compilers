@@ -160,16 +160,17 @@ CAstModule* CParser::module(void)
       m = new CAstModule(t, moduleName.GetValue());
       
       if(_scanner->Peek().GetType() == tSemicolon){
-	Consume(tSemicolon, &t) ;      
+	Consume(tSemicolon, &t);      
 
 	// varDeclaration
 	varDeclaration(m);
 
 	//Optional subroutineDecl
+	CAstScope *p;
 	string str = _scanner->Peek().GetValue();
 	while ( !str.compare("procedure") || !str.compare("function") )
 	  {
-	    subroutineDecl(m);
+	    p = subroutineDecl(m);
 	    str = _scanner->Peek().GetValue();
 	  }
 	//"begin"
@@ -249,7 +250,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	if (_scanner->Peek().GetType() == tLBrak)
 	  {
 	    // statement ::= subroutineCall
-	    subroutineCall();
+	    st = subroutineCall(s, t, 0);
 	  }
 	else
 	  {
@@ -260,32 +261,35 @@ CAstStatement* CParser::statSequence(CAstScope *s)
         
       case tKeyword:
 	// statement ::= ifStatement
+	CAstExpression *ex;
 	if (!_scanner->Peek().GetValue().compare("if")) 
 	  {  
+	    CAstStatement *stIf, *stElse = NULL;
 	    Consume(tKeyword, &t);
-	    Consume(tLBrak, &t);
-	    expression(s);
-	    Consume(tRBrak, &t);
+	    Consume(tLBrak);
+	    ex = expression(s);
+	    Consume(tRBrak);
 	    
-	    Consume(tKeyword, &t);
-	    if (t.GetValue().compare("then"))
+	    if (_scanner->Peek().GetValue().compare("then"))
 	      {
 		SetError(_scanner->Peek(), "Keyword \"then\" expected");
 		break;
 	      }
+	    Consume(tKeyword);
 
-	    statSequence(s);
+	    stIf = statSequence(s);
 	    if (!_scanner->Peek().GetValue().compare("else"))
 		{
-		  Consume(tKeyword, &t);
-		  statSequence(s);
+		  Consume(tKeyword);
+		  stElse = statSequence(s);
 		}
 	    if (!_scanner->Peek().GetValue().compare("end"))
 	      {
-		Consume(tKeyword, &t);
+		Consume(tKeyword);
+		st = new CAstStatIf(t, ex, stIf, stElse);
 		break;
 	      }
-	    
+	    	    
 	    SetError(_scanner->Peek(), "expected \'end\'");
 	    break;
 	  }
@@ -295,9 +299,9 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	  {  
 	    //noColon = false;
 	    Consume(tKeyword, &t);
-	    Consume(tLBrak, &t);
-	    expression(s);
-	    Consume(tRBrak, &t);
+	    Consume(tLBrak);
+	    ex = expression(s);
+	    Consume(tRBrak);
 
 	    if (_scanner->Peek().GetValue().compare("do"))
 	      {
@@ -305,11 +309,13 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 		break;
 	      }
 
-	    Consume(tKeyword, &t);
-	    statSequence(s);
+	    Consume(tKeyword);
+	    st = statSequence(s);
+	    st = new CAstStatWhile(t, ex, st);
+	    
 	    if (_scanner->Peek().GetValue().compare("end"))
 	      {
-		SetError(_scanner->Peek(), "expected \'do\'");
+		SetError(_scanner->Peek(), "expected \'end\'");
 		break;
 	      }
 
@@ -320,23 +326,18 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	else if (!_scanner->Peek().GetValue().compare("return")) 
 	  {  
 	    Consume(tKeyword, &t);
-	    /*
-	    if (_scanner->Peek().GetType() != tSemicolon)
-	      {
-		expression(s);
-	      }
-	    */
+	    
 	    cout <<  "return token: " << _scanner->Peek().GetValue() << endl;
 	    if ( _scanner->Peek().GetValue().compare("end") && _scanner->Peek().GetValue().compare("else") )
 	      {
 		cout << "return expr" << endl;
-		expression(s);
+		ex = expression(s);
 	      }
 	    if (_scanner->Peek().GetType() == tSemicolon)
 	      {
 		SetError(_scanner->Peek(), "do not use semicolon to terminate return.");
 	      }
-	    
+	    st = new CAstStatReturn(t, s, ex);
 	    break;
 	  }
 	
@@ -372,15 +373,23 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	  isFollow = true;
 	}
 
-      if (isFollow) { break; }
-      else 
-	{ 
-	  assert(st != NULL); // ### Need to work
+      if (st != NULL)
+	{
 	  if (head == NULL) head = st;
 	  else tail->SetNext(st); // ### Need to work
 	  tail = st;
-	  Consume(tSemicolon); 
 	}
+
+      if (isFollow) { break; }
+      else { Consume(tSemicolon); }
+
+      /*
+      assert(st != NULL); // ### Need to work
+      if (head == NULL) head = st;
+      else tail->SetNext(st); // ### Need to work
+      tail = st;
+      */
+      
     } while (!_abort);
   }
   cout << "return head " << endl;
@@ -551,7 +560,7 @@ CAstExpression* CParser::factor(CAstScope *s)
     cout << "tok: " << _scanner->Peek().GetValue() << endl;
     if(_scanner->Peek().GetType() == tLBrak)
       {
-	subroutineCall();
+	n = subroutineCall(s, t);
       }
     else
       {
@@ -621,6 +630,7 @@ CAstConstant* CParser::number(void)
   
   errno = 0;
   long long v = strtoll(t.GetValue().c_str(), NULL, 10);
+  if ( v > 2147483648 ) { errno = 1; }
   if (errno != 0) SetError(t, "invalid number.");
 
   return new CAstConstant(t, CTypeManager::Get()->GetInt(), v);
@@ -678,32 +688,50 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   
   const string str = t.GetValue();
 
-  CAstExpression* n, *r;
+  CAstExpression* ex;
+  CAstDesignator* n;
+
+  CSymtab* st = s->GetSymbolTable();
+  const CSymbol* sy = st->FindSymbol(t.GetValue());
+
+  if (sy == NULL)
+    { SetError(_scanner->Peek(), "variable not declared in this scope."); }
+
+  n = new CAstDesignator(t, sy);
   
   while (_scanner->Peek().GetType() == tLSqBrak)
     {
       Consume(tLSqBrak);
-      r = expression(s);
+      ex = expression(s);
       Consume(tRSqBrak);
+      //n->AddIndex(ex);
     }
+  
+  return n;
+  //return new CAstDesignator(t, sy); // ### Does not add "{[expression]}" to AST
+}
+
+CAstFunctionCall* CParser::subroutineCall(CAstScope* s, CToken t)
+{
+  cout << "begin SRcall" << endl;
+  
+  // tIdent is already consumed
+
+  CAstFunctionCall *fn;
+
+  CAstExpression *ex;
 
   CSymtab* st = s->GetSymbolTable();
 
   const CSymbol* sy = st->FindSymbol(t.GetValue());
+
   if (sy == NULL)
     { SetError(_scanner->Peek(), "variable not declared in this scope."); }
-  return new CAstDesignator(t, sy); // ### Does not add "{[expression]}" to AST
-}
+  
+  CSymProc *sp = new CSymProc(sy->GetName(), sy->GetDataType());
 
-void CParser::subroutineCall()
-{
-  cout << "begin SRcall" << endl;
-  CToken dummy;
-  CAstModule *m = new CAstModule(dummy, "placeholder");
+  fn = new CAstFunctionCall(t, sp);
 
-  CToken t;
-
-  // tIdent is already consumed
   Consume(tLBrak, &t);
   if(_scanner->Peek().GetType() == tRBrak)
     {
@@ -711,16 +739,62 @@ void CParser::subroutineCall()
     }
   else
     {
-      expression(m);
+      ex = expression(s);
+      fn->AddArg(ex);
       cout << "first expr " << endl;
       while (_scanner->Peek().GetType() == tComma)
 	{
 	  Consume(tComma, &t);
-	  expression(m);
+	  ex = expression(s);
+	  fn->AddArg(ex);
 	}
       Consume(tRBrak, &t);
     }
+  
   cout << "end subR" << endl;
+  return fn;
+}
+
+CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
+{
+  cout << "begin SRcall" << endl;
+  
+  // tIdent is already consumed
+
+  CAstFunctionCall *fn;
+  CAstExpression *ex;
+  
+  CSymtab* st = s->GetSymbolTable();
+  const CSymbol* sy = st->FindSymbol(t.GetValue());
+
+  if (sy == NULL)
+    { SetError(_scanner->Peek(), "variable not declared in this scope."); }
+
+  CSymProc *sp = new CSymProc(sy->GetName(), sy->GetDataType());
+  
+  fn = new CAstFunctionCall(t, sp);
+  
+  Consume(tLBrak, &t);
+  if(_scanner->Peek().GetType() == tRBrak)
+    {
+      Consume(tRBrak, &t);
+    }
+  else
+    {
+      ex = expression(s);
+      fn->AddArg(ex);
+      cout << "first expr " << endl;
+      while (_scanner->Peek().GetType() == tComma)
+	{
+	  Consume(tComma, &t);
+	  ex = expression(s);
+	  fn->AddArg(ex);
+	}
+      Consume(tRBrak, &t);
+    }
+  
+  cout << "end subR" << endl;
+  return new CAstStatCall(t, fn);
 }
 
 void CParser::varDeclaration(CAstScope* s){
@@ -827,30 +901,33 @@ const CType* CParser::varDecl(CAstScope* s){
   return ct;
 }
 
-void CParser::subroutineDecl(CAstScope* s){
+CAstScope* CParser::subroutineDecl(CAstScope* s){
   //
   //subroutineDecl ::= (procedureDecl | functionDecl) subroutineBody ident ";"
   //
   CToken t, tName; 
   EToken tt = _scanner->Peek().GetType();
   string str = _scanner->Peek().GetValue();
+  CAstStatement *statseq;
 
   CAstScope *sr;
-  CAstFunctionCall *ex;
-
+  
   if (!str.compare("procedure"))
     {
       sr = procedureDecl(s);
-      subroutineBody(sr);
     } 
   else
     {
-      ex = functionDecl(s);
-      subroutineBody(s); // ###
+      sr = functionDecl(s);
     }
+
   
+  
+  statseq = subroutineBody(sr);
+  sr->SetStatementSequence(statseq);
+
   str = _scanner->Peek().GetValue();
-  if (!str.compare(sr->GetName()) || !str.compare(ex->GetSymbol()->GetName()))
+  if (!str.compare(sr->GetName()) || !str.compare(sr->GetName()))
     {
       Consume(tIdent, &t);
       Consume(tSemicolon, &t);
@@ -871,33 +948,36 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   Consume(tKeyword, &t);
   Consume(tIdent, &tName);
   // Creates CSymbol for Procedure
-  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
+  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetNull()));
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
-  
+
   if(_scanner->Peek().GetType() == tLBrak)
     {
       formalParam(sr);
     }
   Consume(tSemicolon, &t);
+
+  s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
   return sr;
 }
 
-CAstFunctionCall* CParser::functionDecl(CAstScope* s){
+CAstScope* CParser::functionDecl(CAstScope* s){
   //
   //functionDecl ::= "function" ident [formalParam] ":" type ";"
   //
   CToken t, tName;
-  CAstFunctionCall *ex;
+  CAstScope *sr;
   
   //CAstScope *s;
   
   Consume(tKeyword, &t);
   Consume(tIdent, &tName);
+  
   // Creates CSymbol for FunctionCall, DataType is not set here
-  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
+  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetNull()));
   // Creates Scope for Procedure
-  ex = new CAstFunctionCall(t, temp);
+  sr = new CAstProcedure(t, tName.GetValue(), s, temp);
 
   if (_scanner->Peek().GetType() == tColon)
     {
@@ -905,7 +985,7 @@ CAstFunctionCall* CParser::functionDecl(CAstScope* s){
     }
   else
     {
-      formalParam(s); // ### Dunno what scope to send to formalParam, if any?
+      formalParam(sr); // ### Dunno what scope to send to formalParam, if any?
       Consume(tColon);
     }
   
@@ -916,17 +996,25 @@ CAstFunctionCall* CParser::functionDecl(CAstScope* s){
     
     // Set DataType
     if (!str.compare("integer"))
-      { temp->SetDataType(CTypeManager::Get()->GetInt()); }
+      { 
+	temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetInt()) );	
+      }
     if (!str.compare("char"))
-      { temp->SetDataType(CTypeManager::Get()->GetChar()); }
+      { 
+	temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetChar()) );
+      }
     if (!str.compare("boolean"))
-      { temp->SetDataType(CTypeManager::Get()->GetBool()); }
+      { 
+	temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetBool()) );
+      }
   }
   else {
     SetError(_scanner->Peek(), "not a basetype");
   }
   Consume(tSemicolon);
-  return ex;
+  
+  s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
+  return sr;
 }
 
 void CParser::formalParam(CAstScope* s){
@@ -947,18 +1035,17 @@ void CParser::formalParam(CAstScope* s){
     }
 }
 
-void CParser::subroutineBody(CAstScope* s){
+CAstStatement* CParser::subroutineBody(CAstScope* s){
   //subroutineBody ::= varDeclaration "begin" statSequence "end" 
   CToken t ;
   // ###
-  //CToken dummy;
-  //CAstModule *m = new CAstModule(dummy, "placeholder");
+  CAstStatement *statseq;  
 
   varDeclaration(s); 
   if (_scanner->Peek().GetType()  == tKeyword && !_scanner->Peek().GetValue().compare("begin")){
     Consume(tKeyword, &t);
     
-    statSequence(s); 
+    statseq = statSequence(s); 
     if (_scanner->Peek().GetType()  == tKeyword && !_scanner->Peek().GetValue().compare("end")){
       Consume(tKeyword, &t);
     }else{
@@ -967,4 +1054,5 @@ void CParser::subroutineBody(CAstScope* s){
   }else {
        SetError(_scanner->Peek(), "keyword \"end\" expected");
   }
+  return statseq;
 }

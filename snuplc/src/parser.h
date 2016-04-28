@@ -111,17 +111,19 @@ class CParser {
     CAstConstant*     boolean(void);
     
     CAstDesignator*   qualident(CAstScope* s, CToken t);
-    void subroutineCall();
     
-    void              varDeclaration(CAstScope* s);
-    void              varDeclSequence(CAstScope* s);
-    const CType*      varDecl(CAstScope* s);
+    CAstFunctionCall* subroutineCall(CAstScope* s, CToken t);
+    CAstStatCall*     subroutineCall(CAstScope* s, CToken t, int dummy);
+    
+    void                varDeclaration(CAstScope* s);
+    void                varDeclSequence(CAstScope* s);
+    const CType*        varDecl(CAstScope* s);
 
-    void                subroutineDecl(CAstScope* s);
+    CAstScope*          subroutineDecl(CAstScope* s);
     CAstScope*          procedureDecl(CAstScope* s);
-    CAstFunctionCall*   functionDecl(CAstScope* s);
+    CAstScope*          functionDecl(CAstScope* s);
     void                formalParam(CAstScope* s);
-    void                subroutineBody(CAstScope* s);
+    CAstStatement*      subroutineBody(CAstScope* s);
     /// @}
 
 
