@@ -110,6 +110,8 @@ class CParser {
     CAstConstant*     character(void);
     CAstConstant*     boolean(void);
     
+    int               escapechar2int(const string text);
+
     CAstDesignator*   qualident(CAstScope* s, CToken t);
     
     CAstFunctionCall* subroutineCall(CAstScope* s, CToken t);

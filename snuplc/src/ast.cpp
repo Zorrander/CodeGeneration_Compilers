@@ -803,7 +803,23 @@ bool CAstBinaryOp::TypeCheck(CToken *t, string *msg) const
 
 const CType* CAstBinaryOp::GetType(void) const
 {
-  return CTypeManager::Get()->GetInt();
+  switch (GetOperation()) {
+  case opAdd:
+  case opMul:
+  case opSub:
+  case opDiv:
+    return CTypeManager::Get()->GetInt();
+  case opAnd:
+  case opOr:
+  case opEqual:
+  case opNotEqual:
+  case opLessThan:
+  case opBiggerThan:
+  case opBiggerEqual:
+    return CTypeManager::Get()->GetBool();
+  default:
+  return NULL;
+  }
 }
 
 ostream& CAstBinaryOp::print(ostream &out, int indent) const

@@ -117,8 +117,16 @@ bool CParser::Consume(EToken type, CToken *token)
 void CParser::InitSymbolTable(CSymtab *s)
 {
   CTypeManager *tm = CTypeManager::Get();
-
+  
   // TODO: add predefined functions here
+  // s->GetSymbolTable()->AddSymbol( s->CreateVar(t.GetValue(), ct) );
+  s->AddSymbol( new CSymbol("DIM", stProcedure, tm->GetInt()) );
+  s->AddSymbol( new CSymbol("DOFS", stProcedure, tm->GetInt()) );
+  s->AddSymbol( new CSymbol("ReadInt", stProcedure, tm->GetInt()) );
+  s->AddSymbol( new CSymbol("WriteChar", stProcedure, tm->GetNull()) );
+  s->AddSymbol( new CSymbol("WriteInt", stProcedure, tm->GetNull()) );
+  s->AddSymbol( new CSymbol("WriteLn", stProcedure, tm->GetNull()) );
+  s->AddSymbol( new CSymbol("WriteStr", stProcedure, tm->GetNull()) );
 }
 
 CAstModule* CParser::module(void)
@@ -152,7 +160,9 @@ CAstModule* CParser::module(void)
       m = new CAstModule(t, moduleName.GetValue());
       
       if(_scanner->Peek().GetType() == tSemicolon){
-	Consume(tSemicolon, &t);      
+	Consume(tSemicolon, &t);    
+
+	InitSymbolTable(m->GetSymbolTable());
 
 	// varDeclaration
 	varDeclaration(m);
@@ -173,7 +183,7 @@ CAstModule* CParser::module(void)
 	 // statSequence
          statseq = statSequence(m);
          m->SetStatementSequence(statseq);
-
+	 
 	 // end module
 	 if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("end") ){
 	   Consume(tKeyword, &t);
@@ -530,7 +540,6 @@ CAstExpression* CParser::factor(CAstScope *s)
     // factor ::= qualident
   case tIdent:
     Consume(tIdent, &t);
-    cout << "tok: " << _scanner->Peek().GetValue() << endl;
     if(_scanner->Peek().GetType() == tLBrak)
       {
 	n = subroutineCall(s, t);
@@ -572,7 +581,7 @@ CAstExpression* CParser::factor(CAstScope *s)
   case tString:
     // n = new CAstConstant 
     Consume(tString, &t);
-    n = new CAstStringConstant(t, t.GetValue(), s);
+    n = new CAstStringConstant(t, CToken::unescape(t.GetValue()), s);
     break ;
 
   default:
@@ -609,18 +618,35 @@ CAstConstant* CParser::number(void)
   return new CAstConstant(t, CTypeManager::Get()->GetInt(), v);
 }
 
+int CParser::escapechar2int(const string text)
+{
+  
+  int c;
+  if ( !text.compare("\\n") ) { c = 10; }
+  else if ( !text.compare("\\t") ) { c = 9; }
+  else if ( !text.compare("\\0") ) { c = 0; }
+  else if ( !text.compare("\\'") ) { c = 39; }
+  else if ( !text.compare("\\\"") ) { c = 34; }
+  else if ( !text.compare("\\\\") ) { c = 92; }
+  else { c = (int)text[0]; }
+  
+  return c;
+}
+
 CAstConstant* CParser::character(void)
 {
   //
   // character
   //
-
+  
   CToken t;
 
   Consume(tChar, &t);
+
+  string str = CToken::unescape(t.GetValue());
+  int val = escapechar2int(str);
   
-  long long v = strtoll(t.GetValue().c_str(), NULL, 10);
-  return new CAstConstant(t, CTypeManager::Get()->GetChar(), v);
+  return new CAstConstant(t, CTypeManager::Get()->GetChar(), (long long)val);
 }
 
 CAstConstant* CParser::boolean(void)
@@ -644,7 +670,7 @@ CAstConstant* CParser::boolean(void)
       SetError(t, "expected boolean (true/false)");
     }
   // ### Is it correct to return bool as 1 || 0 ???
-  return new CAstConstant(t, CTypeManager::Get()->GetBool(), v);
+  return new CAstConstant(t, CTypeManager::Get()->GetBool(), (bool)v);
 }
 
 CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
@@ -662,14 +688,14 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   const string str = t.GetValue();
 
   CAstExpression* ex;
-  CAstDesignator* n;
+  CAstDesignator* n; 
 
   CSymtab* st = s->GetSymbolTable();
   const CSymbol* sy = st->FindSymbol(t.GetValue());
 
   if (sy == NULL)
     { SetError(_scanner->Peek(), "variable not declared in this scope."); }
-
+  
   n = new CAstDesignator(t, sy);
   
   while (_scanner->Peek().GetType() == tLSqBrak)
@@ -686,16 +712,11 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
 
 CAstFunctionCall* CParser::subroutineCall(CAstScope* s, CToken t)
 {
-  cout << "begin SRcall" << endl;
-  
   // tIdent is already consumed
 
   CAstFunctionCall *fn;
-
   CAstExpression *ex;
-
   CSymtab* st = s->GetSymbolTable();
-
   const CSymbol* sy = st->FindSymbol(t.GetValue());
 
   if (sy == NULL)
@@ -714,7 +735,6 @@ CAstFunctionCall* CParser::subroutineCall(CAstScope* s, CToken t)
     {
       ex = expression(s);
       fn->AddArg(ex);
-      cout << "first expr " << endl;
       while (_scanner->Peek().GetType() == tComma)
 	{
 	  Consume(tComma, &t);
@@ -723,17 +743,15 @@ CAstFunctionCall* CParser::subroutineCall(CAstScope* s, CToken t)
 	}
       Consume(tRBrak, &t);
     }
-  
-  cout << "end subR" << endl;
+    
   return fn;
 }
 
 CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
 {
-  cout << "begin SRcall" << endl;
-  
+  //
   // tIdent is already consumed
-
+  //
   CAstFunctionCall *fn;
   CAstExpression *ex;
   
@@ -756,7 +774,6 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
     {
       ex = expression(s);
       fn->AddArg(ex);
-      cout << "first expr " << endl;
       while (_scanner->Peek().GetType() == tComma)
 	{
 	  Consume(tComma, &t);
@@ -766,7 +783,6 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
       Consume(tRBrak, &t);
     }
   
-  cout << "end subR" << endl;
   return new CAstStatCall(t, fn);
 }
 
@@ -808,7 +824,6 @@ void CParser::varDeclSequence(CAstScope* s){
 	Consume(tSemicolon, &t);
       }
     str = _scanner->Peek().GetValue();
-    cout << "val: " << str << endl;
   }
     
 }
@@ -820,6 +835,7 @@ const CType* CParser::varDecl(CAstScope* s){
   string str;
   const CType *ct;
   
+  CToken err_pos = _scanner->Peek();
   Consume(tIdent, &t);
   if (_scanner->Peek().GetType() == tComma){
     Consume(tComma); 
@@ -844,7 +860,7 @@ const CType* CParser::varDecl(CAstScope* s){
 	  if (!str.compare("integer"))
 	    { ct = CTypeManager::Get()->GetInt(); }
 	  
-	  if (!str.compare("character"))
+	  if (!str.compare("char"))
 	    { ct = CTypeManager::Get()->GetChar(); }
 	  
 	  if (!str.compare("boolean"))
@@ -857,11 +873,13 @@ const CType* CParser::varDecl(CAstScope* s){
 	      if (_scanner->Peek().GetType() == tNumber)
 		{
 		  Consume(tNumber, &val);
+		  ct = new CArrayType(stoi(val.GetValue()), ct);
+		}
+	      else
+		{
+		  ct = new CArrayType(-1, ct);
 		}
 	      Consume(tRSqBrak);
-	      
-	      // ### Might be something here about allowing empty brackets
-	      ct = new CArrayType(stoi(val.GetValue()), ct);
 	    }
 	}
       else {
@@ -869,8 +887,8 @@ const CType* CParser::varDecl(CAstScope* s){
       }
     }
 
-  //cout << "Createvar, identifier: " << t.GetValue() << ", type: " << ct <<  endl;
-  s->GetSymbolTable()->AddSymbol( s->CreateVar(t.GetValue(), ct) );
+  bool b = s->GetSymbolTable()->AddSymbol( s->CreateVar(t.GetValue(), ct) );
+  if (!b) { SetError(err_pos, "duplicate variable declaration"); }
   return ct;
 }
 
@@ -921,7 +939,8 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   Consume(tKeyword, &t);
   Consume(tIdent, &tName);
   // Creates CSymbol for Procedure
-  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetNull()));
+  // CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetNull()));
+  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
 
@@ -948,7 +967,8 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   Consume(tIdent, &tName);
   
   // Creates CSymbol for FunctionCall, DataType is not set here
-  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetNull()));
+  // CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetNull()));
+  CSymProc *temp = new CSymProc(tName.GetValue(),CTypeManager::Get()->GetNull());
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
 
@@ -970,15 +990,18 @@ CAstScope* CParser::functionDecl(CAstScope* s){
     // Set DataType
     if (!str.compare("integer"))
       { 
-	temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetInt()) );	
+	//temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetInt()) );
+	temp->SetDataType( CTypeManager::Get()->GetInt() );
       }
     if (!str.compare("char"))
       { 
-	temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetChar()) );
+	//temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetChar()) );
+	temp->SetDataType( CTypeManager::Get()->GetChar() );
       }
     if (!str.compare("boolean"))
       { 
-	temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetBool()) );
+	//temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetBool()) );
+	temp->SetDataType( CTypeManager::Get()->GetBool() );
       }
   }
   else {
