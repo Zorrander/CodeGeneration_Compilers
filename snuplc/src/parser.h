@@ -93,38 +93,119 @@ class CParser {
     void InitSymbolTable(CSymtab *s);
 
     /// @name methods for recursive-descent parsing
+	
     /// @{
-
+	
+	/// @brief  
+	///
+    /// @retval main node for the AST
     CAstModule*       module(void);
 
+	/// @brief go through all the statements in the main part of module or in the procedure/function declaration 
+    /// @param current scope  
+    /// @retval list of statements 
     CAstStatement*    statSequence(CAstScope *s);
 
+	/// @brief call functions for the lhs and rhs plus consume a tAssign
+    /// @param current scope  
+	/// @param type expected token type
+    /// @retval CAstStatAssign node
     CAstStatAssign*   assignment(CAstScope *s, CToken t);
 
+	/// @brief call function for the left simpleExp and eventually consume a RelOp and call an other function for the right simpleExp while it sees RelOp
+    /// @param current scope
+    /// @retval CAstExpression node 
     CAstExpression*   expression(CAstScope *s);
+	
+	/// @brief deal with +/- at the begining, then call term() and eventually consume TermOp and call term() again while it sees TermOp
+    /// @param current scope
+    /// @retval CAstExpression node
     CAstExpression*   simpleexpr(CAstScope *s);
+	
+	/// @brief call factor() and eventually consume factOp and call factor() again while it sees FactOp
+    /// @param current scope
+    /// @retval CAstExpression node
     CAstExpression*   term(CAstScope *s);
+	
+	/// @brief switch on the FIRST and then call the right function
+    /// @param current scope
+    /// @retval CAstExpression node
     CAstExpression*   factor(CAstScope *s);
 
+	/// @brief check if it is valid and consume a tNumber
+    /// 
+    /// @retval CAstConstant node
     CAstConstant*     number(void);
+	
+	/// @brief consume a tChar 
+    /// 
+    /// @retval CAstConstant node
     CAstConstant*     character(void);
+	
+	/// @brief consume a boolean, store the value as an integer 0 false/ 1 true
+    /// @param type expected token type
+    /// @retval CAstConstant node
     CAstConstant*     boolean(void);
     
+	/// @brief associate an ASCII value to an escape character 
+    /// @param unescape value of a character 
+    /// @retval ASCII value of the character
     int               escapechar2int(const string text);
 
+	/// @brief check the existence of the token and deal with the expression
+    /// @param current scope
+    /// @param type expected token type
+    /// @retval CAstDesignator node
     CAstDesignator*   qualident(CAstScope* s, CToken t);
     
+	/// @brief check the existence of the token and deal with what is inside the brackets, empty or not 
+    /// @param current scope
+    /// @param type expected token type
+    /// @retval CAstFunctionCall node
     CAstFunctionCall* subroutineCall(CAstScope* s, CToken t);
+	
+	/// @brief  check the existence of the token and deal with what is inside the brackets, empty or not
+    /// @param current scope
+	/// @param type expected token type
+	/// @param integer made to 
+    /// @retval CAstStatCall node
     CAstStatCall*     subroutineCall(CAstScope* s, CToken t, int dummy);
     
+	/// @brief consume the keyword and call varDeclSequence()
+    /// @param current scope
     void                varDeclaration(CAstScope* s);
+	
+	/// @brief can call varDecl several times
+    /// @param current scope
     void                varDeclSequence(CAstScope* s);
+	
+	/// @brief add one or more var to the scope 
+    /// @param current scope
+    /// @retval 
     const CType*        varDecl(CAstScope* s);
 
+	/// @brief check the global syntax of the declaration
+    /// @param current scope
+    /// @retval CAstScope node
     CAstScope*          subroutineDecl(CAstScope* s);
+	
+	/// @brief add a procedure to the scope 
+    /// @param current scope
+    /// @retval CAstScope node
     CAstScope*          procedureDecl(CAstScope* s);
+	
+	/// @brief add a function to the scope 
+    /// @param current scope
+    /// @retval CAstScope node
     CAstScope*          functionDecl(CAstScope* s);
+	
+	/// @brief deal with the declaration of variables as parameters of the procedure/function
+    /// @param current scope
     void                formalParam(CAstScope* s);
+	
+	/// @brief deal with the declaration of new variables and the statSequence of the procedure/function
+    /// @param current scope
+    /// @retval CAstStatement node
     CAstStatement*      subroutineBody(CAstScope* s);
     /// @}
 
