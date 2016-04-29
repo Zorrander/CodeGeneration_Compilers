@@ -121,32 +121,24 @@ void CParser::InitSymbolTable(CSymtab *s)
   // TODO: add predefined functions here
 }
 
-/*
-CAstModule* CParser::module(void)
-{
-  //
-  // module ::= statSequence  ".".
-  //
-  CToken dummy;
-  CAstModule *m = new CAstModule(dummy, "placeholder");
-  CAstStatement *statseq = NULL;
-
-  statseq = statSequence(m);
-  Consume(tDot);
-
-  m->SetStatementSequence(statseq);
-
-  return m;
-}
-*/
-
 CAstModule* CParser::module(void)
 {
   //
   // module ::= "module" ident ";" varDeclaration { subroutineDecl } "begin" statSequence "end" ident ".".
   //
+  // FIRST(module) ::= { tKeyword = "module" }
+  //
+  // FIRST(varDeclaration) ::= { tKeyword = "var", e }
+  // FOLLOW(varDeclaration) ::= { tKeyword = "procedure" | "function" | "begin" }
+  //
+  // FIRST(subroutineDecl) ::= { tKeyword = "procedure" | "function" }
+  // FOLLOW(subroutineDecl) ::= { tKeyword = "begin" }
+  //
+  // FIRST(statSequence) ::= { tIdent, tKeyword = "if" | "while" | "return" }
+  // FOLLOW(statSequence) ::= { tKeyword = "end" | "else }
+  //
   CToken dummy;
-  CAstModule *m; // = new CAstModule(dummy, "placeholder");
+  CAstModule *m;
   CAstStatement *statseq = NULL;
   
   CToken t;
@@ -165,7 +157,7 @@ CAstModule* CParser::module(void)
 	// varDeclaration
 	varDeclaration(m);
 
-	//Optional subroutineDecl
+	// optional subroutineDecl
 	CAstScope *p;
 	string str = _scanner->Peek().GetValue();
 	while ( !str.compare("procedure") || !str.compare("function") )
@@ -173,26 +165,25 @@ CAstModule* CParser::module(void)
 	    p = subroutineDecl(m);
 	    str = _scanner->Peek().GetValue();
 	  }
-	//"begin"
-	if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("begin") ){
-	  
+	
+	// begin module
+	if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("begin") ){ 
 	 Consume(tKeyword, &t);
 	 
-	 //statSequence
+	 // statSequence
          statseq = statSequence(m);
-               
          m->SetStatementSequence(statseq);
 
-	 //"end" ident "."
+	 // end module
 	 if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("end") ){
-	   Consume(tKeyword, &t) ;
-	   Consume(tIdent, &t) ;
+	   Consume(tKeyword, &t);
+	   Consume(tIdent, &t);
 	   if (moduleName.GetValue().compare(t.GetValue()))
 	     {
 	       SetError(_scanner->Peek(), "module declaration and end did not match.");
 	     }
 
-	   Consume(tDot, &t) ; 
+	   Consume(tDot, &t); 
 	 }
 	}
 	else {
@@ -219,9 +210,9 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 {
   //
   // statSequence ::= [ statement { ";" statement } ].
-  // statement ::= assignment.
-  // FIRST(statSequence) = { tIdent, "if", "while", "return" }
-  // FOLLOW(statSequence) = { "else", "end", tDot }
+  //
+  // FIRST(statement) ::= { tIdent, tKeyword = "if" | "while" | "return" }
+  // FOLLOW(statement) ::= { tKeyword = "end" | "else", ";" }
   //
 
   bool isFollow;
@@ -239,9 +230,6 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       CAstStatement *st = NULL;
       
       isFollow = false;
-      //noColon = false;
-
-      cout << "Beginning of statsequence, token: " << _scanner->Peek().GetValue() << endl;
       
       switch (tt) {
         
@@ -297,7 +285,6 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= whileStatement
 	else if (!_scanner->Peek().GetValue().compare("while")) 
 	  {  
-	    //noColon = false;
 	    Consume(tKeyword, &t);
 	    Consume(tLBrak);
 	    ex = expression(s);
@@ -327,10 +314,8 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	  {  
 	    Consume(tKeyword, &t);
 	    
-	    cout <<  "return token: " << _scanner->Peek().GetValue() << endl;
 	    if ( _scanner->Peek().GetValue().compare("end") && _scanner->Peek().GetValue().compare("else") )
 	      {
-		cout << "return expr" << endl;
 		ex = expression(s);
 	      }
 	    if (_scanner->Peek().GetType() == tSemicolon)
@@ -346,13 +331,11 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	  {
 	    isFollow = true;
 	    break;
-	    //return head; // ### Don't know what is correct to return here ###
 	  }
 	else if (!_scanner->Peek().GetValue().compare("end"))
 	  {
 	    isFollow = true;
 	    break;
-	    //return head; // ### Don't know what is correct to return here ###
 	  }
 
 	else { SetError(_scanner->Peek(), "Got \'" + t.GetValue() + "\', expected keyword { if | while | return | else | end } expected." ); }
@@ -366,33 +349,23 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       tt = _scanner->Peek().GetType();
       if (tt == tDot) break;
 
-      // Check if it is last line in a statSequence.
       if ( !_scanner->Peek().GetValue().compare("end") || !_scanner->Peek().GetValue().compare("else") )
 	{
-	  //cout << "isFollow: " << _scanner->Peek().GetValue() << endl;
 	  isFollow = true;
 	}
 
       if (st != NULL)
 	{
 	  if (head == NULL) head = st;
-	  else tail->SetNext(st); // ### Need to work
+	  else tail->SetNext(st);
 	  tail = st;
 	}
 
       if (isFollow) { break; }
       else { Consume(tSemicolon); }
-
-      /*
-      assert(st != NULL); // ### Need to work
-      if (head == NULL) head = st;
-      else tail->SetNext(st); // ### Need to work
-      tail = st;
-      */
       
     } while (!_abort);
   }
-  cout << "return head " << endl;
   return head;
 }
 
