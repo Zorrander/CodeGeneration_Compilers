@@ -75,6 +75,10 @@ char ETokenName[][TOKEN_STRLEN] = {
   
   "tKeyword",                       ///< a keyword
 
+  "tIf",                            ///< an if statement
+  "tWhile",                         ///< a while statement
+  "tReturn",                        ///< a return statement
+
   "tEOF",                           ///< end of file
   "tIOError",                       ///< I/O error
   "tUndefined",                     ///< undefined
@@ -110,6 +114,10 @@ char ETokenStr[][TOKEN_STRLEN] = {
   "tString (%s)",                   ///< a string
   
   "tKeyword (%s)",                  ///< a keyword
+
+  "tIf",                            ///< an if statement
+  "tWhile",                         ///< a while statement
+  "tReturn",                        ///< a return statement
   
   "tEOF",                           ///< end of file
   "tIOError",                       ///< I/O error

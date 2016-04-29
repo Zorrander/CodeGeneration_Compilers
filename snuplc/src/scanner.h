@@ -74,6 +74,10 @@ enum EToken {
   
   tKeyword,                         ///< a keyword
 
+  tIf,                              ///< an if statement
+  tWhile,                           ///< a while statement
+  tReturn,                          ///< a return statement
+
   tEOF,                             ///< end of file
   tIOError,                         ///< I/O error
   tUndefined,                       ///< undefined

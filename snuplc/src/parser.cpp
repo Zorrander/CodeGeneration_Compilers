@@ -252,12 +252,13 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	  }
 	else
 	  {
-	    // statement ::= assignment -> qualident 
+	    // statement ::= assignment
 	    st = assignment(s, t);
 	  }
 	break;
         
       case tKeyword:
+	
 	// statement ::= ifStatement
 	CAstExpression *ex;
 	if (!_scanner->Peek().GetValue().compare("if")) 
@@ -319,6 +320,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	    Consume(tKeyword, &t);
 	    break;
 	  }
+	
 	// statement ::= returnStatement
 	else if (!_scanner->Peek().GetValue().compare("return")) 
 	  {  
@@ -328,7 +330,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	      {
 		ex = expression(s);
 	      }
-	    if (_scanner->Peek().GetType() == tSemicolon)
+	    if ( _scanner->Peek().GetType() == tSemicolon )
 	      {
 		SetError(_scanner->Peek(), "do not use semicolon to terminate return.");
 	      }
@@ -336,7 +338,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	    break;
 	  }
 	
-	// ### else if peek == end return, since end is in follow of statSequence. ###
+	// Sets follow true to exit current statement sequence scope
 	else if(!_scanner->Peek().GetValue().compare("else"))
 	  {
 	    isFollow = true;
@@ -434,14 +436,13 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
   // 
   // FIRST(simpleexpr) ::= { "+", "-", FIRST(factor) }
   // FOLLOW(simpleexpr) ::= { relOp, tDot }
-
+  //
   CAstExpression *n = NULL;
   CAstExpression *l = n, *r;
   CToken t;
   
   string str;
   
-  // Deals with expression starting with ["+"|"-"]
   if ( !_scanner->Peek().GetValue().compare("+") || !_scanner->Peek().GetValue().compare("-") )
     {
       Consume(tTermOp, &t);
@@ -453,8 +454,6 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
       n = term(s);
     }
   
-  // While loop for casting "long" expression, ex : a = 3 + 4 - 8 ...
-  // Becomes a chain of BinaryOp
   while (_scanner->Peek().GetType() == tTermOp) {
     
     l = n;
@@ -475,17 +474,15 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
       {
 	n = new CAstBinaryOp(t, opOr, l, r);
       }
-    //n = new CAstBinaryOp(t, t.GetValue() == "+" ? opAdd : opSub, l, r);
   }
-
-
+  
   return n;
 }
 
 CAstExpression* CParser::term(CAstScope *s)
 {
   //
-  // term ::= factor { ("*"|"/") factor }.
+  // term ::= factor { ("*"|"/"|"&&") factor }.
   //
   CAstExpression *n = NULL;
 
@@ -515,9 +512,7 @@ CAstExpression* CParser::term(CAstScope *s)
       {
 	n = new CAstBinaryOp(t, opAnd, l, r);
       }
-    
-    //n = new CAstBinaryOp(t, t.GetValue() == "*" ? opMul : opDiv, l, r);
-
+        
     tt = _scanner->Peek().GetType();
   }
 
@@ -537,7 +532,8 @@ CAstExpression* CParser::factor(CAstScope *s)
   CAstExpression *unary = NULL, *n = NULL;
 
   switch (tt) {
-    // factor ::= qualident
+    
+    // factor ::= qualident || subroutineCall
   case tIdent:
     Consume(tIdent, &t);
     if(_scanner->Peek().GetType() == tLBrak)
@@ -549,10 +545,12 @@ CAstExpression* CParser::factor(CAstScope *s)
 	n = qualident(s, t);
       }
     break;
+    
     // factor ::= number
   case tNumber:
     n = number();
     break;
+    
     // factor ::= bool
   case tKeyword:
     n = boolean();
@@ -565,8 +563,8 @@ CAstExpression* CParser::factor(CAstScope *s)
     Consume(tRBrak, &t);
     break;
 
-  case tNot:
     //factor ::= !factor
+  case tNot:
     Consume(tNot, &t);
     unary = factor(s);
     n = new CAstUnaryOp(t, opNot, unary);
@@ -579,7 +577,6 @@ CAstExpression* CParser::factor(CAstScope *s)
 
     //factor ::= string 
   case tString:
-    // n = new CAstConstant 
     Consume(tString, &t);
     n = new CAstStringConstant(t, CToken::unescape(t.GetValue()), s);
     break ;
@@ -591,11 +588,6 @@ CAstExpression* CParser::factor(CAstScope *s)
   }
 
   return n;
-  
-  //CAstStringConstant *test = new CAstStringConstant(t, "hej", s);
-  
-  //return test;
-  //return new CAstStringConstant(t, "hej", s);
 }
 
 CAstConstant* CParser::number(void)
@@ -690,6 +682,8 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   CAstExpression* ex;
   CAstDesignator* n; 
 
+  CAstArrayDesignator *test;
+
   CSymtab* st = s->GetSymbolTable();
   const CSymbol* sy = st->FindSymbol(t.GetValue());
 
@@ -697,30 +691,36 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
     { SetError(_scanner->Peek(), "variable not declared in this scope."); }
   
   n = new CAstDesignator(t, sy);
+  test = new CAstArrayDesignator(t, sy);
   
+  bool isArray = false;
   while (_scanner->Peek().GetType() == tLSqBrak)
     {
+      isArray = true;
       Consume(tLSqBrak);
       ex = expression(s);
       Consume(tRSqBrak);
-      //n->AddIndex(ex);
+      test->AddIndex(ex);
     }
   
-  return n;
-  //return new CAstDesignator(t, sy); // ### Does not add "{[expression]}" to AST
+  if (isArray)
+    return test;
+  else
+    return n;
 }
 
 CAstFunctionCall* CParser::subroutineCall(CAstScope* s, CToken t)
 {
+  //
   // tIdent is already consumed
-
+  //
   CAstFunctionCall *fn;
   CAstExpression *ex;
   CSymtab* st = s->GetSymbolTable();
   const CSymbol* sy = st->FindSymbol(t.GetValue());
 
   if (sy == NULL)
-    { SetError(_scanner->Peek(), "variable not declared in this scope."); }
+    { SetError(_scanner->Peek(), "procedure/function not declared in this scope."); }
   
   CSymProc *sp = new CSymProc(sy->GetName(), sy->GetDataType());
 
@@ -759,7 +759,7 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
   const CSymbol* sy = st->FindSymbol(t.GetValue());
 
   if (sy == NULL)
-    { SetError(_scanner->Peek(), "variable not declared in this scope."); }
+    { SetError(_scanner->Peek(), "procedure/function not declared in this scope."); }
 
   CSymProc *sp = new CSymProc(sy->GetName(), sy->GetDataType());
   
@@ -787,29 +787,25 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
 }
 
 void CParser::varDeclaration(CAstScope* s){
-
   //
   // FOLLOW(varDeclaration) = { "begin", "procedure", "function" }
   // FIRST(var)
   //
-
   CToken t ;
   
   //varDeclaration ::= "var" varDeclSequence ";"
   if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("var")){
     Consume(tKeyword, &t);
-    varDeclSequence(s); 
-  }
-  else {
-    //SetError(_scanner->Peek(), "var declaration expected. It should start with \"var\"");
+    varDeclSequence(s);
   }
 }
 
 void CParser::varDeclSequence(CAstScope* s){
-  CToken t ;
-
-  //varDeclSequence ::= varDecl { ";" varDecl }
-  varDecl(s) ;
+  //
+  // varDeclSequence ::= varDecl { ";" varDecl }
+  //
+  CToken t;
+  varDecl(s);
   if (_scanner->Peek().GetType() != tRBrak)
       {
 	Consume(tSemicolon, &t);
@@ -829,7 +825,9 @@ void CParser::varDeclSequence(CAstScope* s){
 }
 
 const CType* CParser::varDecl(CAstScope* s){
-
+  //
+  // Recursive function that returns the type of the variable
+  //
   EToken nextToken;
   CToken t, val, baseType;
   string str;
@@ -889,6 +887,7 @@ const CType* CParser::varDecl(CAstScope* s){
 
   bool b = s->GetSymbolTable()->AddSymbol( s->CreateVar(t.GetValue(), ct) );
   if (!b) { SetError(err_pos, "duplicate variable declaration"); }
+  
   return ct;
 }
 
@@ -937,10 +936,12 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   CAstScope *sr;
 
   Consume(tKeyword, &t);
+  CToken err_pos = _scanner->Peek();
   Consume(tIdent, &tName);
   // Creates CSymbol for Procedure
-  // CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetNull()));
+  
   CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
+  
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
 
@@ -950,13 +951,21 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
     }
   Consume(tSemicolon, &t);
 
-  s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
+  //temp->AddParam(new CSymParam(0, "int", CTypeManager::Get()->GetBool()));
+  //temp->AddParam(new CSymParam(1, "hej2", CTypeManager::Get()->GetInt()));
+  //int N = temp->GetNParams();
+  //cout << "num params: " << N << endl;
+  
+  bool b = s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
+  if (!b) { SetError(err_pos, "duplicate procedure declaration"); }
+  //s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp) );
+  temp->AddParam(new CSymParam(0, "int", CTypeManager::Get()->GetBool()));
   return sr;
 }
 
 CAstScope* CParser::functionDecl(CAstScope* s){
   //
-  //functionDecl ::= "function" ident [formalParam] ":" type ";"
+  // functionDecl ::= "function" ident [formalParam] ":" type ";"
   //
   CToken t, tName;
   CAstScope *sr;
@@ -964,6 +973,7 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   //CAstScope *s;
   
   Consume(tKeyword, &t);
+  CToken err_pos = _scanner->Peek();
   Consume(tIdent, &tName);
   
   // Creates CSymbol for FunctionCall, DataType is not set here
@@ -978,7 +988,7 @@ CAstScope* CParser::functionDecl(CAstScope* s){
     }
   else
     {
-      formalParam(sr); // ### Dunno what scope to send to formalParam, if any?
+      formalParam(sr);
       Consume(tColon);
     }
   
@@ -990,17 +1000,14 @@ CAstScope* CParser::functionDecl(CAstScope* s){
     // Set DataType
     if (!str.compare("integer"))
       { 
-	//temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetInt()) );
 	temp->SetDataType( CTypeManager::Get()->GetInt() );
       }
     if (!str.compare("char"))
       { 
-	//temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetChar()) );
 	temp->SetDataType( CTypeManager::Get()->GetChar() );
       }
     if (!str.compare("boolean"))
       { 
-	//temp->SetDataType( CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetBool()) );
 	temp->SetDataType( CTypeManager::Get()->GetBool() );
       }
   }
@@ -1009,7 +1016,8 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   }
   Consume(tSemicolon);
   
-  s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
+  bool b = s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
+  if (!b) { SetError(err_pos, "duplicate function declaration"); }
   return sr;
 }
 
