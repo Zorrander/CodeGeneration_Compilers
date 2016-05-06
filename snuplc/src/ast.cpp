@@ -167,6 +167,21 @@ bool CAstScope::TypeCheck(CToken *t, string *msg) const
 {
   bool result = true;
 
+  try {
+    CAstStatement *s = _statseq;
+    while (result && (s != NULL)) {
+      result = s->TypeCheck(t, msg);
+      s = s->GetNext();
+    }
+    vector<CAstScope*>::const_iterator it = _children.begin();
+    while (result && (it != _children.end())) {
+      result = (*it)->TypeCheck(t, msg);
+      it++;
+    }
+  } catch (...) {
+    result = false;
+  }
+
   return result;
 }
 
@@ -378,7 +393,20 @@ CAstExpression* CAstStatAssign::GetRHS(void) const
 
 bool CAstStatAssign::TypeCheck(CToken *t, string *msg) const
 {
-  return true;
+  bool result = true;
+  
+  if (_lhs->GetType() != _rhs->GetType())
+    { 
+      *t = GetToken();
+      *msg = "type mismatch in assignment.";
+      return false;
+    }
+  
+  // ### Do we only need to check RHS?
+  if (result = GetLHS()->TypeCheck(t, msg))
+    { return GetRHS()->TypeCheck(t, msg); }
+  
+  return result;
 }
 
 const CType* CAstStatAssign::GetType(void) const
@@ -798,7 +826,46 @@ CAstExpression* CAstBinaryOp::GetRight(void) const
 
 bool CAstBinaryOp::TypeCheck(CToken *t, string *msg) const
 {
-  return true;
+  // ### Maybe not most optimal solution
+  bool result = true;
+  
+  if (GetLeft()->GetType() != GetRight()->GetType())
+    {
+      *t = GetToken();
+      *msg = "type mismatch between lhs and rhs.";
+      return false;
+    }
+
+  if (GetLeft()->GetType() == CTypeManager::Get()->GetInt())
+    {
+      // ### Any operator ok
+    }
+
+  if (GetLeft()->GetType() == CTypeManager::Get()->GetBool())
+    {
+      // ### only opAnd:
+      //          opOr:
+      //          opEqual:
+      //          opNotEqual:
+      // are ok.
+      if ( !(GetOperation() != opAnd || GetOperation() != opOr || GetOperation() != opEqual || GetOperation() != opNotEqual) )
+	{
+	  *t = GetToken();
+	  *msg = "type mismatch between operand and operators.";
+	  return false;
+	}
+    }
+  
+  if (GetLeft()->GetType() == CTypeManager::Get()->GetChar())
+    {
+      // ### No yet implemented
+    }
+  
+  // ### Do we need the left one?
+   if (result = GetLeft()->TypeCheck(t, msg))
+     { result = GetRight()->TypeCheck(t, msg); }
+  
+  return result;
 }
 
 const CType* CAstBinaryOp::GetType(void) const
@@ -809,12 +876,15 @@ const CType* CAstBinaryOp::GetType(void) const
   case opSub:
   case opDiv:
     return CTypeManager::Get()->GetInt();
+    // ### Only these four should work with bools
   case opAnd:
   case opOr:
   case opEqual:
   case opNotEqual:
+    // ### Last three should not work with bools.
   case opLessThan:
-  case opBiggerThan:
+  case opLessEqual:
+  case opBiggerThan:    
   case opBiggerEqual:
     return CTypeManager::Get()->GetBool();
   default:
@@ -887,12 +957,31 @@ CAstExpression* CAstUnaryOp::GetOperand(void) const
 
 bool CAstUnaryOp::TypeCheck(CToken *t, string *msg) const
 {
-  return true;
+  bool result = true;
+  
+  if (this->GetType() != GetOperand()->GetType())
+    {
+      *t = GetToken();
+      *msg = "type mismatch in unary operand.";
+      result = false;
+    }
+  
+  return result;
 }
 
 const CType* CAstUnaryOp::GetType(void) const
 {
-  return CTypeManager::Get()->GetInt();
+  // ### Can it not be both bool and int?
+
+  switch (GetOperation()) {
+  case opNeg:
+  case opPos:
+    return CTypeManager::Get()->GetInt();
+  case opNot:
+    return CTypeManager::Get()->GetBool();
+  default:
+  return NULL;
+  }
 }
 
 ostream& CAstUnaryOp::print(ostream &out, int indent) const
@@ -1202,6 +1291,7 @@ bool CAstArrayDesignator::TypeCheck(CToken *t, string *msg) const
 {
   bool result = true;
 
+  // ### What does this one do?
   assert(_done);
 
   return result;
