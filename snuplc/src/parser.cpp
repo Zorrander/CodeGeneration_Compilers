@@ -681,12 +681,13 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
 
   CAstExpression* ex;
   CAstDesignator* n; 
-
   CAstArrayDesignator *test;
 
   CSymtab* st = s->GetSymbolTable();
   const CSymbol* sy = st->FindSymbol(t.GetValue());
-
+  const CType* ty = sy->GetDataType();
+  const CArrayType* aty;
+  
   if (sy == NULL)
     { SetError(_scanner->Peek(), "variable not declared in this scope."); }
   
@@ -708,14 +709,45 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
 	}
       test->AddIndex(ex);
     }
+
+  if ( ty->IsArray() && isArray )
+    {
+      test->IndicesComplete();
+      aty = dynamic_cast<const CArrayType*>(sy->GetDataType());
+      
+      if (aty->GetNDim() != test->GetNIndices())
+	{
+	  SetError( t, "declared dimensions does not agree with accessed dimensions.");
+	}
+      return test;
+    }
+  else if ( !ty->IsArray() && !isArray )
+    {
+      return n;
+    }
+  // ### Maybe better error msg?
+  else if ( ty->IsArray() && !isArray )
+    {
+      SetError( t, "variable declared as array, accessed as !array");
+    }
+  else
+    {
+      SetError( t, "variable declared as !array, accessed as array");
+    }
   
+  /*
   if (isArray)
     {
       test->IndicesComplete();
+      cout << "size1: " << sy->GetDataType()->GetSize() 
+	   << "\tsize2: " << test->GetNIndices() << endl;
+      //if ( sy->GetDataType().GetNDim() != test->GetNIndices() )
+
       return test;
     }
   else
     return n;
+  */
 }
 
 CAstFunctionCall* CParser::subroutineCall(CAstScope* s, CToken t)
@@ -880,10 +912,14 @@ const CType* CParser::varDecl(CAstScope* s){
 	      if (_scanner->Peek().GetType() == tNumber)
 		{
 		  Consume(tNumber, &val);
-		  ct = new CArrayType(stoi(val.GetValue()), ct);
+		  if (stoi(val.GetValue()) > 0)
+		    ct = new CArrayType(stoi(val.GetValue()), ct);
+		  else
+		    SetError(val, "attempted to assign array size <= 0.");
 		}
 	      else
 		{
+		  // ### Allow empty brackets?
 		  ct = new CArrayType(-1, ct);
 		}
 	      Consume(tRSqBrak);
