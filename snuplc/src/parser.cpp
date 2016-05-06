@@ -700,6 +700,12 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
       Consume(tLSqBrak);
       ex = expression(s);
       Consume(tRSqBrak);
+
+      // ### Added check for accessing elements < 0
+      if ( ex->GetToken().GetType() == tTermOp )
+	{
+	  SetError( ex->GetToken(), "attempted to access index < 0.");
+	}
       test->AddIndex(ex);
     }
   
