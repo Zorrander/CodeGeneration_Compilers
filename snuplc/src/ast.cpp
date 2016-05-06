@@ -1299,7 +1299,18 @@ bool CAstArrayDesignator::TypeCheck(CToken *t, string *msg) const
 
 const CType* CAstArrayDesignator::GetType(void) const
 {
-  return GetSymbol()->GetDataType();
+
+  // ### Attempting to fix return type of CAstArrayDesignator (working?)
+  const CType* ct = GetSymbol()->GetDataType();
+  const CArrayType* cat;
+  
+  if (ct->IsArray())
+    {
+      cat = dynamic_cast<const CArrayType*>(ct);
+      ct = cat->GetBaseType();
+    }
+
+  return ct;
 }
 
 ostream& CAstArrayDesignator::print(ostream &out, int indent) const
