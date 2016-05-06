@@ -334,6 +334,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	      {
 		SetError(_scanner->Peek(), "do not use semicolon to terminate return.");
 	      }
+	    ex = NULL;
 	    st = new CAstStatReturn(t, s, ex);
 	    break;
 	  }
