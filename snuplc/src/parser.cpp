@@ -323,18 +323,19 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	
 	// statement ::= returnStatement
 	else if (!_scanner->Peek().GetValue().compare("return")) 
-	  {  
+	  { 
 	    Consume(tKeyword, &t);
-	    
 	    if ( _scanner->Peek().GetValue().compare("end") && _scanner->Peek().GetValue().compare("else") )
 	      {
 		ex = expression(s);
 	      }
+	    else { 
+	      ex = NULL; 
+	    }
 	    if ( _scanner->Peek().GetType() == tSemicolon )
 	      {
 		SetError(_scanner->Peek(), "do not use semicolon to terminate return.");
 	      }
-	    ex = NULL;
 	    st = new CAstStatReturn(t, s, ex);
 	    break;
 	  }
@@ -1005,7 +1006,7 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   bool b = s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
   if (!b) { SetError(err_pos, "duplicate procedure declaration"); }
   //s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp) );
-  temp->AddParam(new CSymParam(0, "int", CTypeManager::Get()->GetBool()));
+  //temp->AddParam(new CSymParam(0, "int", CTypeManager::Get()->GetBool()));
   return sr;
 }
 
