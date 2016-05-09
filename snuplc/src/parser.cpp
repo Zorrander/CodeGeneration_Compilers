@@ -119,14 +119,13 @@ void CParser::InitSymbolTable(CSymtab *s)
   CTypeManager *tm = CTypeManager::Get();
   
   // TODO: add predefined functions here
-  // s->GetSymbolTable()->AddSymbol( s->CreateVar(t.GetValue(), ct) );
-  s->AddSymbol( new CSymbol("DIM", stProcedure, tm->GetInt()) );
-  s->AddSymbol( new CSymbol("DOFS", stProcedure, tm->GetInt()) );
-  s->AddSymbol( new CSymbol("ReadInt", stProcedure, tm->GetInt()) );
-  s->AddSymbol( new CSymbol("WriteChar", stProcedure, tm->GetNull()) );
-  s->AddSymbol( new CSymbol("WriteInt", stProcedure, tm->GetNull()) );
-  s->AddSymbol( new CSymbol("WriteLn", stProcedure, tm->GetNull()) );
-  s->AddSymbol( new CSymbol("WriteStr", stProcedure, tm->GetNull()) );
+  s->AddSymbol( new CSymProc("DIM", tm->GetInt()) );
+  s->AddSymbol( new CSymProc("DOFS", tm->GetInt()) );
+  s->AddSymbol( new CSymProc("ReadInt", tm->GetInt()) );
+  s->AddSymbol( new CSymProc("WriteChar", tm->GetNull()) );
+  s->AddSymbol( new CSymProc("WriteInt", tm->GetNull()) );
+  s->AddSymbol( new CSymProc("WriteLn", tm->GetNull()) );
+  s->AddSymbol( new CSymProc("WriteStr", tm->GetNull()) );
 }
 
 CAstModule* CParser::module(void)
@@ -979,11 +978,12 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   //
   //procedureDecl ::= "procedure" ident [formalParam] ";"
   //
-  CToken t, tName;
+  CToken t, tName, err_pos;
   CAstScope *sr;
+  
 
   Consume(tKeyword, &t);
-  CToken err_pos = _scanner->Peek();
+  err_pos = _scanner->Peek();
   Consume(tIdent, &tName);
   // Creates CSymbol for Procedure
   
@@ -998,15 +998,16 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
     }
   Consume(tSemicolon, &t);
 
-  //temp->AddParam(new CSymParam(0, "int", CTypeManager::Get()->GetBool()));
-  //temp->AddParam(new CSymParam(1, "hej2", CTypeManager::Get()->GetInt()));
-  //int N = temp->GetNParams();
-  //cout << "num params: " << N << endl;
+  // Get procedure/function parameters
+  vector<CSymbol*> sym_vec = sr->GetSymbolTable()->GetSymbols();
+  for (int i = 0; i < sym_vec.size(); i++)
+    {
+      temp->AddParam( new CSymParam(i, sym_vec.at(i)->GetName(), sym_vec.at(i)->GetDataType()) );
+    }
   
-  bool b = s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
+  bool b = s->GetSymbolTable()->AddSymbol( temp );
   if (!b) { SetError(err_pos, "duplicate procedure declaration"); }
-  //s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp) );
-  //temp->AddParam(new CSymParam(0, "int", CTypeManager::Get()->GetBool()));
+
   return sr;
 }
 
@@ -1014,17 +1015,16 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   //
   // functionDecl ::= "function" ident [formalParam] ":" type ";"
   //
-  CToken t, tName;
+  CToken t, tName, err_pos;
   CAstScope *sr;
   
   //CAstScope *s;
   
   Consume(tKeyword, &t);
-  CToken err_pos = _scanner->Peek();
+  err_pos = _scanner->Peek();
   Consume(tIdent, &tName);
   
   // Creates CSymbol for FunctionCall, DataType is not set here
-  // CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetPointer(CTypeManager::Get()->GetNull()));
   CSymProc *temp = new CSymProc(tName.GetValue(),CTypeManager::Get()->GetNull());
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
@@ -1062,16 +1062,23 @@ CAstScope* CParser::functionDecl(CAstScope* s){
     SetError(_scanner->Peek(), "not a basetype");
   }
   Consume(tSemicolon);
+
+  // Get procedure/function parameters
+  vector<CSymbol*> sym_vec = sr->GetSymbolTable()->GetSymbols();
+  for (int i = 0; i < sym_vec.size(); i++)
+    {
+      temp->AddParam( new CSymParam(i, sym_vec.at(i)->GetName(), sym_vec.at(i)->GetDataType()) );
+    }
   
-  bool b = s->GetSymbolTable()->AddSymbol( s->CreateVar(tName.GetValue(), temp->GetDataType()) );
+  bool b = s->GetSymbolTable()->AddSymbol( temp );
   if (!b) { SetError(err_pos, "duplicate function declaration"); }
   return sr;
 }
 
 void CParser::formalParam(CAstScope* s){
+  //
   // formalParam ::= "(" [varDeclSequence] ")"
-  //CToken dummy;
-  //CAstModule *m = new CAstModule(dummy, "dummy fp");
+  //
   CToken t ; 
 
   Consume(tLBrak, &t); 
