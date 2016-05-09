@@ -1323,6 +1323,8 @@ const CType* CAstArrayDesignator::GetType(void) const
 {
 
   // ### Attempting to fix return type of CAstArrayDesignator (working?)
+
+  /*
   const CType* ct = GetSymbol()->GetDataType();
   const CArrayType* cat;
   
@@ -1331,6 +1333,11 @@ const CType* CAstArrayDesignator::GetType(void) const
       cat = dynamic_cast<const CArrayType*>(ct);
       ct = cat->GetBaseType();
     }
+  */
+
+  const CType* ct = GetSymbol()->GetDataType()->GetBaseType();
+
+  //if ( ct == NULL ) { SetError(, "not an array type."); }
 
   return ct;
 }
