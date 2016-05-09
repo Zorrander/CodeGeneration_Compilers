@@ -626,6 +626,33 @@ CAstStatement* CAstStatIf::GetElseBody(void) const
 
 bool CAstStatIf::TypeCheck(CToken *t, string *msg) const
 {
+  // ### Check if expression, if and else body has type mismatches.
+  CAstExpression *e = GetCondition();
+  
+  if (e != NULL)
+    {
+      // Type check expression
+      if ( !e->TypeCheck(t, msg) ) { return false; }
+      // Type check that is is bool
+      if ( !e->GetType()->Match(CTypeManager::Get()->GetBool()) ) 
+	{ 
+	  if (t != NULL) *t = e->GetToken();
+	  if (msg != NULL) *msg = "expression is not boolean.";
+	  return false; 
+	}
+    }
+  
+  // Check if if and else body is present and if they return valid statement sequences
+  if ( GetIfBody() != NULL )
+    {
+      if ( !GetIfBody()->TypeCheck(t, msg) ) { return false; }
+    }
+  
+  if ( GetElseBody() != NULL )
+    {
+      if ( !GetElseBody()->TypeCheck(t, msg) ) { return false; }
+    }
+  
   return true;
 }
 
@@ -726,6 +753,29 @@ CAstStatement* CAstStatWhile::GetBody(void) const
 
 bool CAstStatWhile::TypeCheck(CToken *t, string *msg) const
 {
+  
+  // ### Check while expression and body for type mismatch
+  CAstExpression *e = GetCondition();
+  
+  if (e != NULL)
+    {
+      // Type check expression
+      if ( !e->TypeCheck(t, msg) ) { return false; }
+      // Type check that is is bool
+      if ( !e->GetType()->Match(CTypeManager::Get()->GetBool()) ) 
+	{ 
+	  if (t != NULL) *t = e->GetToken();
+	  if (msg != NULL) *msg = "expression is not boolean.";
+	  return false; 
+	}
+    }
+  
+  // Check if while body is present and if it returns valid statement sequences
+  if ( GetBody() != NULL )
+    {
+      if ( !GetBody()->TypeCheck(t, msg) ) { return false; }
+    }
+  
   return true;
 }
 
@@ -1323,22 +1373,9 @@ const CType* CAstArrayDesignator::GetType(void) const
 {
 
   // ### Attempting to fix return type of CAstArrayDesignator (working?)
-
-  /*
-  const CType* ct = GetSymbol()->GetDataType();
-  const CArrayType* cat;
-  
-  if (ct->IsArray())
-    {
-      cat = dynamic_cast<const CArrayType*>(ct);
-      ct = cat->GetBaseType();
-    }
-  */
-
   const CType* ct = GetSymbol()->GetDataType()->GetBaseType();
-
-  //if ( ct == NULL ) { SetError(, "not an array type."); }
-
+  
+  // ### Check if ct == NULL?
   return ct;
 }
 
