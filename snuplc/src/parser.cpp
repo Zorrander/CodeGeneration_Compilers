@@ -240,6 +240,8 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       CAstStatement *st = NULL;
       
       isFollow = false;
+
+      cout << "isfollow? " << isFollow << " scanner: " << _scanner->Peek().GetValue() << endl;
       
       switch (tt) {
         
@@ -258,7 +260,6 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	break;
         
       case tKeyword:
-	
 	// statement ::= ifStatement
 	CAstExpression *ex;
 	if (!_scanner->Peek().GetValue().compare("if")) 
@@ -324,18 +325,24 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= returnStatement
 	else if (!_scanner->Peek().GetValue().compare("return")) 
 	  { 
+	    cout << "ret?" << endl;
 	    Consume(tKeyword, &t);
+	    cout << "isfollow? " << isFollow << " scanner: " << _scanner->Peek().GetValue() << endl;
 	    if ( _scanner->Peek().GetValue().compare("end") && _scanner->Peek().GetValue().compare("else") )
 	      {
-		ex = expression(s);
+		if ( _scanner->Peek().GetType() != tSemicolon )
+		  {
+		    ex = expression(s);
+		  }
+		else
+		  {
+		    ex = NULL; 
+		  }
 	      }
 	    else { 
 	      ex = NULL; 
 	    }
-	    if ( _scanner->Peek().GetType() == tSemicolon )
-	      {
-		SetError(_scanner->Peek(), "do not use semicolon to terminate return.");
-	      }
+	    
 	    st = new CAstStatReturn(t, s, ex);
 	    break;
 	  }
@@ -375,9 +382,13 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	  tail = st;
 	}
 
+      cout << "isfollow? " << isFollow << " scanner: " << _scanner->Peek().GetValue() << endl;
+      
       if (isFollow) { break; }
       else { Consume(tSemicolon); }
       
+      cout << "isfollow? " << isFollow << " scanner: " << _scanner->Peek().GetValue() << endl;
+
     } while (!_abort);
   }
   return head;
@@ -726,12 +737,6 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
       Consume(tLSqBrak);
       ex = expression(s);
       Consume(tRSqBrak);
-
-      // ### Added check for accessing elements < 0
-      if ( ex->GetToken().GetType() == tTermOp )
-	{
-	  SetError( ex->GetToken(), "attempted to access index < 0.");
-	}
       test->AddIndex(ex);
     }
 
@@ -750,7 +755,9 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
     {
       return n;
     }
+  else { return n; }
   // ### Maybe better error msg?
+  /*
   else if ( ty->IsArray() && !isArray )
     {
       SetError( t, "variable declared as array, accessed as !array");
@@ -759,19 +766,6 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
     {
       SetError( t, "variable declared as !array, accessed as array");
     }
-  
-  /*
-  if (isArray)
-    {
-      test->IndicesComplete();
-      cout << "size1: " << sy->GetDataType()->GetSize() 
-	   << "\tsize2: " << test->GetNIndices() << endl;
-      //if ( sy->GetDataType().GetNDim() != test->GetNIndices() )
-
-      return test;
-    }
-  else
-    return n;
   */
 }
 
