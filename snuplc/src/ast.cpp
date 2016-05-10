@@ -394,7 +394,7 @@ CAstExpression* CAstStatAssign::GetRHS(void) const
 bool CAstStatAssign::TypeCheck(CToken *t, string *msg) const
 {
   bool result = true;
-  
+
   if (_lhs->GetType() != _rhs->GetType())
     { 
       *t = GetToken();
@@ -920,7 +920,10 @@ bool CAstBinaryOp::TypeCheck(CToken *t, string *msg) const
       //          opEqual:
       //          opNotEqual:
       // are ok.
-      if ( !(GetOperation() != opAnd || GetOperation() != opOr || GetOperation() != opEqual || GetOperation() != opNotEqual) )
+      if ( !( GetOperation() == opAnd || 
+	      GetOperation() == opOr || 
+	      GetOperation() == opEqual || 
+	      GetOperation() == opNotEqual) )
 	{
 	  *t = GetToken();
 	  *msg = "type mismatch between operand and operators.";
@@ -930,7 +933,12 @@ bool CAstBinaryOp::TypeCheck(CToken *t, string *msg) const
   
   if (GetLeft()->GetType() == CTypeManager::Get()->GetChar())
     {
-      // ### No yet implemented
+      if ( !(GetOperation() != opEqual || GetOperation() != opNotEqual) )
+	{
+	  *t = GetToken();
+	  *msg = "type mismatch between operand and operators.";
+	  return false;
+	}
     }
   
   // ### Do we need the left one?
@@ -953,7 +961,7 @@ const CType* CAstBinaryOp::GetType(void) const
   case opOr:
   case opEqual:
   case opNotEqual:
-    // ### Last three should not work with bools.
+    // ### Last four should not work with bools.
   case opLessThan:
   case opLessEqual:
   case opBiggerThan:    
@@ -1031,7 +1039,7 @@ bool CAstUnaryOp::TypeCheck(CToken *t, string *msg) const
 {
   bool result = true;
   
-  if (this->GetType() != GetOperand()->GetType())
+  if (GetType() != GetOperand()->GetType())
     {
       *t = GetToken();
       *msg = "type mismatch in unary operand.";
@@ -1198,6 +1206,47 @@ CAstExpression* CAstFunctionCall::GetArg(int index) const
 
 bool CAstFunctionCall::TypeCheck(CToken *t, string *msg) const
 {
+  int N_call = GetNArgs();
+  CAstExpression** expr = new CAstExpression*[N_call];
+
+  // Parameters from the call
+  for (int i = 0; i < N_call; i++)
+    {
+      expr[i] = GetArg(i);
+    }
+
+  const CSymProc* sp = GetSymbol();
+
+  int N_decl = sp->GetNParams();
+  const CSymParam** parm = new const CSymParam*[N_decl];
+
+  // Parameters from the declaration
+  for (int i = 0; i < N_decl; i++)
+    {
+      parm[i] = sp->GetParam(i);
+    }
+   cout << "call: " << N_call << " decl: " << N_decl << endl;
+
+  if (N_call != N_decl) 
+    {
+      if (t != NULL) { *t = GetToken(); }
+      if (msg != NULL) { *msg = "wrong number of parameters in function/procedure call."; }
+      return false;
+    }
+
+  for (int i = 0; i < N_call; i++)
+    {
+      if (expr[i]->GetType() != parm[i]->GetDataType())
+	{
+	  if (t != NULL) { *t = expr[i]->GetToken(); }
+	  if (msg != NULL) { *msg = "type mismatch in function/procedure parameters."; }
+	  return false;
+	}
+    }
+
+  delete [] expr;
+  delete [] parm;
+
   return true;
 }
 
@@ -1279,6 +1328,7 @@ const CSymbol* CAstDesignator::GetSymbol(void) const
 
 bool CAstDesignator::TypeCheck(CToken *t, string *msg) const
 {
+  // ### ToDo
   return true;
 }
 

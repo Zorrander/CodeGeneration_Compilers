@@ -69,6 +69,7 @@ CAstNode* CParser::Parse(void)
     if (_module != NULL) {
       CToken t;
       string msg;
+      cout << "Typechecking..." << endl;
       if (!_module->TypeCheck(&t, &msg)) SetError(t, msg);
     }
   } catch (...) {
@@ -448,11 +449,33 @@ CAstExpression* CParser::simpleexpr(CAstScope *s)
     {
       Consume(tTermOp, &t);
       r = term(s);
+      
+      if (r->GetToken().GetType() == tNumber)
+	{
+	  long long v = strtoll(r->GetToken().GetValue().c_str(), NULL, 10);
+	  if (t.GetValue() == "+" && v >= 2147483648)
+	    {
+	      SetError(_scanner->Peek(), "number out of bounds.");
+	    }
+	  if (t.GetValue() == "-" && v > 2147483648)
+	    {
+	      SetError(_scanner->Peek(), "number out of bounds.");
+	    }
+	}
+      
       n = new CAstUnaryOp(t, t.GetValue() == "+" ? opPos : opNeg, r);
     }
   else
     {
       n = term(s);
+      if (n->GetToken().GetType() == tNumber)
+	{
+	  long long v = strtoll(n->GetToken().GetValue().c_str(), NULL, 10);
+	  if (v >= 2147483648)
+	    {
+	      SetError(_scanner->Peek(), "number out of bounds.");
+	    }
+	}
     }
   
   while (_scanner->Peek().GetType() == tTermOp) {
@@ -686,11 +709,12 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
 
   CSymtab* st = s->GetSymbolTable();
   const CSymbol* sy = st->FindSymbol(t.GetValue());
-  const CType* ty = sy->GetDataType();
-  const CArrayType* aty;
   
   if (sy == NULL)
     { SetError(_scanner->Peek(), "variable not declared in this scope."); }
+  
+  const CType* ty = sy->GetDataType();
+  const CArrayType* aty;
   
   n = new CAstDesignator(t, sy);
   test = new CAstArrayDesignator(t, sy);
@@ -764,10 +788,12 @@ CAstFunctionCall* CParser::subroutineCall(CAstScope* s, CToken t)
   if (sy == NULL)
     { SetError(_scanner->Peek(), "procedure/function not declared in this scope."); }
   
-  CSymProc *sp = new CSymProc(sy->GetName(), sy->GetDataType());
-
+  //CSymProc *sp = new CSymProc(sy->GetName(), sy->GetDataType());
+  const CSymProc *sp = dynamic_cast<const CSymProc*>(sy);
+  
+  //fn = new CAstFunctionCall(t, sp);
   fn = new CAstFunctionCall(t, sp);
-
+  
   Consume(tLBrak, &t);
   if(_scanner->Peek().GetType() == tRBrak)
     {
@@ -803,8 +829,10 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
   if (sy == NULL)
     { SetError(_scanner->Peek(), "procedure/function not declared in this scope."); }
 
-  CSymProc *sp = new CSymProc(sy->GetName(), sy->GetDataType());
+  //CSymProc *sp = new CSymProc(sy->GetName(), sy->GetDataType());
+  const CSymProc *sp = dynamic_cast<const CSymProc*>(sy);
   
+  //fn = new CAstFunctionCall(t, sp);
   fn = new CAstFunctionCall(t, sp);
   
   Consume(tLBrak, &t);
@@ -871,7 +899,7 @@ const CType* CParser::varDecl(CAstScope* s){
   // Recursive function that returns the type of the variable
   //
   EToken nextToken;
-  CToken t, val, baseType;
+  CToken t, val, baseType, sqError;
   string str;
   const CType *ct;
   
@@ -909,7 +937,7 @@ const CType* CParser::varDecl(CAstScope* s){
 	  // Create array using type and expression
 	  while (_scanner->Peek().GetType() == tLSqBrak)
 	    {
-	      Consume(tLSqBrak);
+	      Consume(tLSqBrak, &sqError);
 	      if (_scanner->Peek().GetType() == tNumber)
 		{
 		  Consume(tNumber, &val);
@@ -921,7 +949,8 @@ const CType* CParser::varDecl(CAstScope* s){
 	      else
 		{
 		  // ### Allow empty brackets?
-		  ct = new CArrayType(-1, ct);
+		  //ct = new CArrayType(-1, ct);
+		  SetError(sqError, "array size not declared.");
 		}
 	      Consume(tRSqBrak);
 	    }
@@ -957,8 +986,6 @@ CAstScope* CParser::subroutineDecl(CAstScope* s){
       sr = functionDecl(s);
     }
 
-  
-  
   statseq = subroutineBody(sr);
   sr->SetStatementSequence(statseq);
 
@@ -979,7 +1006,7 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   //procedureDecl ::= "procedure" ident [formalParam] ";"
   //
   CToken t, tName, err_pos;
-  CAstScope *sr;
+  CAstScope *sr, *sr_ugly;
   
 
   Consume(tKeyword, &t);
@@ -992,19 +1019,25 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
 
+  //CAstModule* m = new CAstModule(t, "dummy");
+  //InitSymbolTable(m->GetSymbolTable());
+  //sr_ugly = new CAstProcedure(t, tName.GetValue(), m, temp);
+  
   if(_scanner->Peek().GetType() == tLBrak)
     {
       formalParam(sr);
+      //formalParam(sr_ugly);
     }
   Consume(tSemicolon, &t);
 
   // Get procedure/function parameters
   vector<CSymbol*> sym_vec = sr->GetSymbolTable()->GetSymbols();
+  //vector<CSymbol*> sym_vec = sr_ugly->GetSymbolTable()->GetSymbols();
   for (int i = 0; i < sym_vec.size(); i++)
     {
       temp->AddParam( new CSymParam(i, sym_vec.at(i)->GetName(), sym_vec.at(i)->GetDataType()) );
     }
-  
+
   bool b = s->GetSymbolTable()->AddSymbol( temp );
   if (!b) { SetError(err_pos, "duplicate procedure declaration"); }
 
@@ -1016,7 +1049,7 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   // functionDecl ::= "function" ident [formalParam] ":" type ";"
   //
   CToken t, tName, err_pos;
-  CAstScope *sr;
+  CAstScope *sr, *sr_ugly;
   
   //CAstScope *s;
   
@@ -1025,9 +1058,13 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   Consume(tIdent, &tName);
   
   // Creates CSymbol for FunctionCall, DataType is not set here
-  CSymProc *temp = new CSymProc(tName.GetValue(),CTypeManager::Get()->GetNull());
+  CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
+  
+  //CAstModule* m = new CAstModule(t, "dummy");
+  //InitSymbolTable(m->GetSymbolTable());
+  //sr_ugly = new CAstProcedure(t, tName.GetValue(), m, temp);
 
   if (_scanner->Peek().GetType() == tColon)
     {
@@ -1036,6 +1073,7 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   else
     {
       formalParam(sr);
+      //formalParam(sr_ugly);
       Consume(tColon);
     }
   
@@ -1065,6 +1103,7 @@ CAstScope* CParser::functionDecl(CAstScope* s){
 
   // Get procedure/function parameters
   vector<CSymbol*> sym_vec = sr->GetSymbolTable()->GetSymbols();
+  //vector<CSymbol*> sym_vec = sr_ugly->GetSymbolTable()->GetSymbols();
   for (int i = 0; i < sym_vec.size(); i++)
     {
       temp->AddParam( new CSymParam(i, sym_vec.at(i)->GetName(), sym_vec.at(i)->GetDataType()) );
