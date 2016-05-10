@@ -173,16 +173,17 @@ class CParser {
     
   /// @brief consume the keyword and call varDeclSequence()
   /// @param current scope
-  void                varDeclaration(CAstScope* s);
+  void                varDeclaration(CAstScope* s, bool isProc);
 	
   /// @brief can call varDecl several times
   /// @param current scope
-  void                varDeclSequence(CAstScope* s);
+  void                varDeclSequence(CAstScope* s, bool isProc);
 	
   /// @brief add one or more var to the scope 
   /// @param current scope
+  /// @param indicator
   /// @retval CType node
-  const CType*        varDecl(CAstScope* s);
+  const CType*        varDecl(CAstScope* s, bool isProc);
 
   /// @brief check the global syntax of the declaration
   /// @param current scope
@@ -201,7 +202,7 @@ class CParser {
 	
   /// @brief deal with the declaration of variables as parameters of the procedure/function
   /// @param current scope
-  void                formalParam(CAstScope* s);
+  void                formalParam(CAstScope* s, bool isProc);
 	
   /// @brief deal with the declaration of new variables and the statSequence of the procedure/function
   /// @param current scope

@@ -165,7 +165,7 @@ CAstModule* CParser::module(void)
 	InitSymbolTable(m->GetSymbolTable());
 
 	// varDeclaration
-	varDeclaration(m);
+	varDeclaration(m, false);
 
 	// optional subroutineDecl
 	CAstScope *p;
@@ -856,7 +856,7 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
   return new CAstStatCall(t, fn);
 }
 
-void CParser::varDeclaration(CAstScope* s){
+void CParser::varDeclaration(CAstScope* s, bool isProc){
   //
   // FOLLOW(varDeclaration) = { "begin", "procedure", "function" }
   // FIRST(var)
@@ -866,16 +866,16 @@ void CParser::varDeclaration(CAstScope* s){
   //varDeclaration ::= "var" varDeclSequence ";"
   if( _scanner->Peek().GetType() == tKeyword && !_scanner->Peek().GetValue().compare("var")){
     Consume(tKeyword, &t);
-    varDeclSequence(s);
+    varDeclSequence(s, isProc);
   }
 }
 
-void CParser::varDeclSequence(CAstScope* s){
+void CParser::varDeclSequence(CAstScope* s, bool isProc){
   //
   // varDeclSequence ::= varDecl { ";" varDecl }
   //
   CToken t;
-  varDecl(s);
+  varDecl(s, isProc);
   if (_scanner->Peek().GetType() != tRBrak)
       {
 	Consume(tSemicolon, &t);
@@ -884,7 +884,7 @@ void CParser::varDeclSequence(CAstScope* s){
   
   while ( str.compare("procedure") && str.compare("function") && (_scanner->Peek().GetType() != tRBrak) && str.compare("begin") ){
     
-    varDecl(s) ; 
+    varDecl(s, isProc) ; 
     if (_scanner->Peek().GetType() != tRBrak)
       {
 	Consume(tSemicolon, &t);
@@ -894,7 +894,7 @@ void CParser::varDeclSequence(CAstScope* s){
     
 }
 
-const CType* CParser::varDecl(CAstScope* s){
+const CType* CParser::varDecl(CAstScope* s, bool isProc){
   //
   // Recursive function that returns the type of the variable
   //
@@ -907,7 +907,7 @@ const CType* CParser::varDecl(CAstScope* s){
   Consume(tIdent, &t);
   if (_scanner->Peek().GetType() == tComma){
     Consume(tComma); 
-    ct = varDecl(s);
+    ct = varDecl(s, isProc);
   }
   else
     {
@@ -949,8 +949,9 @@ const CType* CParser::varDecl(CAstScope* s){
 	      else
 		{
 		  // ### Allow empty brackets?
-		  //ct = new CArrayType(-1, ct);
-		  SetError(sqError, "array size not declared.");
+		  if (isProc) { ct = new CArrayType(-1, ct); }
+		  else { SetError(sqError, "array size not declared."); }
+		  
 		}
 	      Consume(tRSqBrak);
 	    }
@@ -959,8 +960,26 @@ const CType* CParser::varDecl(CAstScope* s){
 	SetError(_scanner->Peek(), "not a regular type.");
       }
     }
+  /*
+  vector<CSymbol*> sym_vec = sr->GetSymbolTable()->GetSymbols();
+  for (int i = 0; i < sym_vec.size(); i++)
+    {
+      temp->AddParam( new CSymParam(i, sym_vec.at(i)->GetName(), sym_vec.at(i)->GetDataType()) );
+    }
+  */
+  bool b;
+  if (isProc)
+    {
+      CAstProcedure* sr = dynamic_cast<CAstProcedure*>(s);
+      int count = sr->GetSymbol()->GetNParams();
+      sr->GetSymbol()->AddParam( new CSymParam(count, t.GetValue(), ct) );
 
-  bool b = s->GetSymbolTable()->AddSymbol( s->CreateVar(t.GetValue(), ct) );
+      b = sr->GetSymbolTable()->AddSymbol( sr->CreateVar(t.GetValue(), ct) );
+    }
+  else
+    {
+      b = s->GetSymbolTable()->AddSymbol( s->CreateVar(t.GetValue(), ct) );
+    }
   if (!b) { SetError(err_pos, "duplicate variable declaration"); }
   
   return ct;
@@ -1006,7 +1025,7 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   //procedureDecl ::= "procedure" ident [formalParam] ";"
   //
   CToken t, tName, err_pos;
-  CAstScope *sr, *sr_ugly;
+  CAstScope *sr;
   
 
   Consume(tKeyword, &t);
@@ -1018,25 +1037,12 @@ CAstScope* CParser::procedureDecl(CAstScope* s){
   
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
-
-  //CAstModule* m = new CAstModule(t, "dummy");
-  //InitSymbolTable(m->GetSymbolTable());
-  //sr_ugly = new CAstProcedure(t, tName.GetValue(), m, temp);
   
   if(_scanner->Peek().GetType() == tLBrak)
     {
-      formalParam(sr);
-      //formalParam(sr_ugly);
+      formalParam(sr, true);
     }
   Consume(tSemicolon, &t);
-
-  // Get procedure/function parameters
-  vector<CSymbol*> sym_vec = sr->GetSymbolTable()->GetSymbols();
-  //vector<CSymbol*> sym_vec = sr_ugly->GetSymbolTable()->GetSymbols();
-  for (int i = 0; i < sym_vec.size(); i++)
-    {
-      temp->AddParam( new CSymParam(i, sym_vec.at(i)->GetName(), sym_vec.at(i)->GetDataType()) );
-    }
 
   bool b = s->GetSymbolTable()->AddSymbol( temp );
   if (!b) { SetError(err_pos, "duplicate procedure declaration"); }
@@ -1049,7 +1055,7 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   // functionDecl ::= "function" ident [formalParam] ":" type ";"
   //
   CToken t, tName, err_pos;
-  CAstScope *sr, *sr_ugly;
+  CAstScope *sr;
   
   //CAstScope *s;
   
@@ -1061,10 +1067,6 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   CSymProc *temp = new CSymProc(tName.GetValue(), CTypeManager::Get()->GetNull());
   // Creates Scope for Procedure
   sr = new CAstProcedure(t, tName.GetValue(), s, temp);
-  
-  //CAstModule* m = new CAstModule(t, "dummy");
-  //InitSymbolTable(m->GetSymbolTable());
-  //sr_ugly = new CAstProcedure(t, tName.GetValue(), m, temp);
 
   if (_scanner->Peek().GetType() == tColon)
     {
@@ -1072,8 +1074,7 @@ CAstScope* CParser::functionDecl(CAstScope* s){
     }
   else
     {
-      formalParam(sr);
-      //formalParam(sr_ugly);
+      formalParam(sr, true);
       Consume(tColon);
     }
   
@@ -1100,21 +1101,13 @@ CAstScope* CParser::functionDecl(CAstScope* s){
     SetError(_scanner->Peek(), "not a basetype");
   }
   Consume(tSemicolon);
-
-  // Get procedure/function parameters
-  vector<CSymbol*> sym_vec = sr->GetSymbolTable()->GetSymbols();
-  //vector<CSymbol*> sym_vec = sr_ugly->GetSymbolTable()->GetSymbols();
-  for (int i = 0; i < sym_vec.size(); i++)
-    {
-      temp->AddParam( new CSymParam(i, sym_vec.at(i)->GetName(), sym_vec.at(i)->GetDataType()) );
-    }
   
   bool b = s->GetSymbolTable()->AddSymbol( temp );
   if (!b) { SetError(err_pos, "duplicate function declaration"); }
   return sr;
 }
 
-void CParser::formalParam(CAstScope* s){
+void CParser::formalParam(CAstScope* s, bool isProc){
   //
   // formalParam ::= "(" [varDeclSequence] ")"
   //
@@ -1127,7 +1120,7 @@ void CParser::formalParam(CAstScope* s){
     }
   else
     {
-      varDeclSequence(s);
+      varDeclSequence(s, isProc);
       Consume (tRBrak, &t);
     }
 }
@@ -1138,7 +1131,7 @@ CAstStatement* CParser::subroutineBody(CAstScope* s){
   // ###
   CAstStatement *statseq;  
 
-  varDeclaration(s); 
+  varDeclaration(s, false); 
   if (_scanner->Peek().GetType()  == tKeyword && !_scanner->Peek().GetValue().compare("begin")){
     Consume(tKeyword, &t);
     
