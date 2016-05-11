@@ -161,6 +161,11 @@ CPointerType::CPointerType(const CType *basetype)
 {
 }
 
+const CType* CPointerType::GetBaseType(void) const
+{ 
+  return _basetype; 
+}
+
 bool CPointerType::Match(const CType *t) const
 {
   if ((t == NULL) || !t->IsPointer()) return false;

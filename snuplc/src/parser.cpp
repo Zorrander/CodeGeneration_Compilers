@@ -241,8 +241,6 @@ CAstStatement* CParser::statSequence(CAstScope *s)
       
       isFollow = false;
 
-      cout << "isfollow? " << isFollow << " scanner: " << _scanner->Peek().GetValue() << endl;
-      
       switch (tt) {
         
       case tIdent:
@@ -325,9 +323,7 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	// statement ::= returnStatement
 	else if (!_scanner->Peek().GetValue().compare("return")) 
 	  { 
-	    cout << "ret?" << endl;
 	    Consume(tKeyword, &t);
-	    cout << "isfollow? " << isFollow << " scanner: " << _scanner->Peek().GetValue() << endl;
 	    if ( _scanner->Peek().GetValue().compare("end") && _scanner->Peek().GetValue().compare("else") )
 	      {
 		if ( _scanner->Peek().GetType() != tSemicolon )
@@ -381,13 +377,9 @@ CAstStatement* CParser::statSequence(CAstScope *s)
 	  else tail->SetNext(st);
 	  tail = st;
 	}
-
-      cout << "isfollow? " << isFollow << " scanner: " << _scanner->Peek().GetValue() << endl;
       
       if (isFollow) { break; }
       else { Consume(tSemicolon); }
-      
-      cout << "isfollow? " << isFollow << " scanner: " << _scanner->Peek().GetValue() << endl;
 
     } while (!_abort);
   }
@@ -726,47 +718,64 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   
   const CType* ty = sy->GetDataType();
   const CArrayType* aty;
+  const CType* ptr = ty;
+  
+  bool elemAccess = false;
+  if ( _scanner->Peek().GetType() == tLSqBrak ) 
+    { 
+      
+      elemAccess = true;
+      if ( ty->IsPointer() )
+	{
+      
+	}
+      if ( ty->IsArray() )
+	{
+      
+	}
+    }
   
   n = new CAstDesignator(t, sy);
   test = new CAstArrayDesignator(t, sy);
+
+  vector<CAstExpression*> expr;
   
-  bool isArray = false;
   while (_scanner->Peek().GetType() == tLSqBrak)
     {
-      isArray = true;
       Consume(tLSqBrak);
       ex = expression(s);
       Consume(tRSqBrak);
-      test->AddIndex(ex);
+      expr.push_back(ex);
+
+      if ( ty->IsArray() )
+	{
+	  aty = dynamic_cast<const CArrayType*>(ty);
+	}
     }
 
-  if ( ty->IsArray() && isArray )
+  while ( !expr.empty() )
+    {
+      test->AddIndex(expr.back());
+      expr.pop_back();
+    }
+
+  if ( ty->IsArray() && elemAccess )
     {
       test->IndicesComplete();
       aty = dynamic_cast<const CArrayType*>(sy->GetDataType());
       
-      if (aty->GetNDim() != test->GetNIndices())
-	{
-	  SetError( t, "declared dimensions does not agree with accessed dimensions.");
-	}
       return test;
     }
-  else if ( !ty->IsArray() && !isArray )
+  else if ( ty->IsPointer() && elemAccess )
+    {
+      test->IndicesComplete();
+      return test;
+    }
+  else if ( !ty->IsArray() && !elemAccess )
     {
       return n;
     }
   else { return n; }
-  // ### Maybe better error msg?
-  /*
-  else if ( ty->IsArray() && !isArray )
-    {
-      SetError( t, "variable declared as array, accessed as !array");
-    }
-  else
-    {
-      SetError( t, "variable declared as !array, accessed as array");
-    }
-  */
 }
 
 CAstFunctionCall* CParser::subroutineCall(CAstScope* s, CToken t)
@@ -895,7 +904,7 @@ const CType* CParser::varDecl(CAstScope* s, bool isProc){
   EToken nextToken;
   CToken t, val, baseType, sqError;
   string str;
-  const CType *ct;
+  const CType *ct, *ct_ret, *ct_mem;
   
   CToken err_pos = _scanner->Peek();
   Consume(tIdent, &t);
@@ -928,45 +937,62 @@ const CType* CParser::varDecl(CAstScope* s, bool isProc){
 	  if (!str.compare("boolean"))
 	    { ct = CTypeManager::Get()->GetBool(); }
 	  
+	  ct_mem = ct;
 	  // Create array using type and expression
-	  while (_scanner->Peek().GetType() == tLSqBrak)
+	  vector<CType*> vec;
+	  vector<int> vec_val;
+	  if (_scanner->Peek().GetType() == tLSqBrak)
 	    {
-	      Consume(tLSqBrak, &sqError);
-	      if (_scanner->Peek().GetType() == tNumber)
+	      while (_scanner->Peek().GetType() == tLSqBrak)
 		{
-		  Consume(tNumber, &val);
-		  if (stoi(val.GetValue()) > 0)
-		    ct = new CArrayType(stoi(val.GetValue()), ct);
+		  Consume(tLSqBrak, &sqError);
+		  if (_scanner->Peek().GetType() == tNumber)
+		    {
+		      Consume(tNumber, &val);
+		      if (stoi(val.GetValue()) <= 0)
+			SetError(val, "attempted to assign array size <= 0.");
+		      else
+			{
+			  vec_val.push_back(stoi(val.GetValue()));
+			}
+		    }
+		  else if (isProc)
+		    {
+		      vec_val.push_back(-1);
+		    }
 		  else
-		    SetError(val, "attempted to assign array size <= 0.");
+		    {
+		      SetError(sqError, "array size required.");
+		    }
+		  Consume(tRSqBrak);
 		}
-	      else
-		{
-		  // ### Allow empty brackets?
-		  if (isProc) { ct = new CArrayType(-1, ct); }
-		  else { SetError(sqError, "array size not declared."); }
-		  
-		}
-	      Consume(tRSqBrak);
 	    }
+
+	  while (!vec_val.empty())
+	    {
+	      ct = new CArrayType(vec_val.back(), ct);
+	      vec_val.pop_back();
+	    }
+
 	}
       else {
 	SetError(_scanner->Peek(), "not a regular type.");
       }
     }
-  /*
-  vector<CSymbol*> sym_vec = sr->GetSymbolTable()->GetSymbols();
-  for (int i = 0; i < sym_vec.size(); i++)
+  
+  // ### Need to do some fancy stuff to get pointers and arrays to work..
+  ct_ret = ct;
+  if (isProc)
     {
-      temp->AddParam( new CSymParam(i, sym_vec.at(i)->GetName(), sym_vec.at(i)->GetDataType()) );
+      ct = CTypeManager::Get()->GetPointer(ct);
     }
-  */
+  
   bool b;
   if (isProc)
     {
       CAstProcedure* sr = dynamic_cast<CAstProcedure*>(s);
       int count = sr->GetSymbol()->GetNParams();
-      sr->GetSymbol()->AddParam( new CSymParam(count, t.GetValue(), ct) );
+      sr->GetSymbol()->AddParam( new CSymParam(count, t.GetValue(), ct));
 
       b = sr->GetSymbolTable()->AddSymbol( sr->CreateVar(t.GetValue(), ct) );
     }
@@ -976,7 +1002,7 @@ const CType* CParser::varDecl(CAstScope* s, bool isProc){
     }
   if (!b) { SetError(err_pos, "duplicate variable declaration"); }
   
-  return ct;
+  return ct_ret;
 }
 
 CAstScope* CParser::subroutineDecl(CAstScope* s){

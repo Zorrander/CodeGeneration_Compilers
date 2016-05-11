@@ -403,6 +403,7 @@ bool CAstStatAssign::TypeCheck(CToken *t, string *msg) const
     }
   
   // ### Do we only need to check RHS?
+  cout << "assign!" << endl;
   if (result = GetLHS()->TypeCheck(t, msg))
     { return GetRHS()->TypeCheck(t, msg); }
   
@@ -1329,6 +1330,7 @@ const CSymbol* CAstDesignator::GetSymbol(void) const
 bool CAstDesignator::TypeCheck(CToken *t, string *msg) const
 {
   // ### ToDo
+  cout << "todo castDesignator" << endl;
   return true;
 }
 
@@ -1413,8 +1415,20 @@ bool CAstArrayDesignator::TypeCheck(CToken *t, string *msg) const
 {
   bool result = true;
 
+  cout << "hej" << endl;
+
   // ### What does this one do?
   assert(_done);
+
+  for (int i = 0; i < GetNIndices(); i++)
+    {
+      if ( GetIndex(i)->TypeCheck(t, msg) && GetIndex(i)->GetType() == CTypeManager::Get()->GetInt() )
+	{
+	  result = true;
+	}
+      else
+	result = false;
+    }
 
   return result;
 }
@@ -1423,10 +1437,28 @@ const CType* CAstArrayDesignator::GetType(void) const
 {
 
   // ### Attempting to fix return type of CAstArrayDesignator (working?)
-  const CType* ct = GetSymbol()->GetDataType()->GetBaseType();
+  const CType* test;
+  const CArrayType* a;
+
+  const CSymbol* s = GetSymbol();
+  test = s->GetDataType();
+
+  int N = GetNIndices();
+
+  if (test->IsPointer())
+    test = test->GetBaseType();
   
-  // ### Check if ct == NULL?
-  return ct;
+  while (N > 0)
+    {
+      if (test->IsArray())
+	{
+	  a = dynamic_cast<const CArrayType*>(test);
+	  test = a->GetInnerType();
+	}
+      N--;
+    }
+
+  return test;
 }
 
 ostream& CAstArrayDesignator::print(ostream &out, int indent) const

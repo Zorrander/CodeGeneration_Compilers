@@ -366,7 +366,7 @@ class CPointerType : public CScalarType {
 
     /// @brief return the base type
     /// @retval CType* base type
-    const CType* GetBaseType(void) const { return _basetype; };
+    const CType* GetBaseType(void) const;
 
     /// @}
 
