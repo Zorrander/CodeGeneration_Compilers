@@ -706,6 +706,8 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   
   const string str = t.GetValue();
 
+  CToken err;
+
   CAstExpression* ex;
   CAstDesignator* n; 
   CAstArrayDesignator *test;
@@ -722,17 +724,8 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   
   bool elemAccess = false;
   if ( _scanner->Peek().GetType() == tLSqBrak ) 
-    { 
-      
+    {  
       elemAccess = true;
-      if ( ty->IsPointer() )
-	{
-      
-	}
-      if ( ty->IsArray() )
-	{
-      
-	}
     }
   
   n = new CAstDesignator(t, sy);
@@ -742,14 +735,27 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   
   while (_scanner->Peek().GetType() == tLSqBrak)
     {
-      Consume(tLSqBrak);
+      Consume(tLSqBrak, &err);
       ex = expression(s);
       Consume(tRSqBrak);
       expr.push_back(ex);
-
+    }
+  
+  if ( elemAccess )
+    {
+      if ( ty->IsPointer() )
+	{
+	  ty = ty->GetBaseType();
+	}
       if ( ty->IsArray() )
 	{
 	  aty = dynamic_cast<const CArrayType*>(ty);
+	}
+      int nElem = aty->GetNDim();
+      int nAcce = expr.size();
+      if (nAcce > nElem)
+	{
+	  SetError(err, "invalid array expression.");
 	}
     }
 
@@ -762,8 +768,6 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
   if ( ty->IsArray() && elemAccess )
     {
       test->IndicesComplete();
-      aty = dynamic_cast<const CArrayType*>(sy->GetDataType());
-      
       return test;
     }
   else if ( ty->IsPointer() && elemAccess )

@@ -395,15 +395,20 @@ bool CAstStatAssign::TypeCheck(CToken *t, string *msg) const
 {
   bool result = true;
 
+  //cout << "LH: " <<_lhs->GetType() << "RH: " << _rhs->GetType() << endl;
   if (_lhs->GetType() != _rhs->GetType())
     { 
       *t = GetToken();
       *msg = "type mismatch in assignment.";
       return false;
     }
+  if ( _lhs->GetType()->IsArray() )
+    {
+      *t = GetToken();
+      *msg = "compound assigment not allowed.";
+      return false;
+    }
   
-  // ### Do we only need to check RHS?
-  cout << "assign!" << endl;
   if (result = GetLHS()->TypeCheck(t, msg))
     { return GetRHS()->TypeCheck(t, msg); }
   
@@ -1415,8 +1420,6 @@ bool CAstArrayDesignator::TypeCheck(CToken *t, string *msg) const
 {
   bool result = true;
 
-  cout << "hej" << endl;
-
   // ### What does this one do?
   assert(_done);
 
@@ -1454,6 +1457,10 @@ const CType* CAstArrayDesignator::GetType(void) const
 	{
 	  a = dynamic_cast<const CArrayType*>(test);
 	  test = a->GetInnerType();
+	}
+      else
+	{
+
 	}
       N--;
     }
