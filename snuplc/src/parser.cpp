@@ -841,6 +841,7 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
   
   //fn = new CAstFunctionCall(t, sp);
   fn = new CAstFunctionCall(t, sp);
+  CAstSpecialOp* spec;
   
   Consume(tLBrak, &t);
   if(_scanner->Peek().GetType() == tRBrak)
@@ -850,12 +851,29 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
   else
     {
       ex = expression(s);
-      fn->AddArg(ex);
+          
+      if(ex->GetType()->IsArray())
+	{
+	  spec = new CAstSpecialOp(ex->GetToken(), opAddress, ex, NULL);
+	  fn->AddArg(spec);
+	}
+      else
+	{
+	  fn->AddArg(ex);
+	}
+      
       while (_scanner->Peek().GetType() == tComma)
 	{
 	  Consume(tComma, &t);
-	  ex = expression(s);
-	  fn->AddArg(ex);
+	  if (ex->GetType()->IsArray())
+	    {
+	      spec = new CAstSpecialOp(ex->GetToken(), opAddress, ex, NULL);
+	      fn->AddArg(spec);
+	    }
+	  else
+	    {
+	      fn->AddArg(ex);
+	    }
 	}
       Consume(tRBrak, &t);
     }
@@ -924,6 +942,10 @@ const CType* CParser::varDecl(CAstScope* s, bool isProc){
   nextToken = _scanner->Peek().GetType();
   str = _scanner->Peek().GetValue();
 
+  // Create array using type and expression
+  vector<CType*> vec;
+  vector<int> vec_val;
+  
   if (nextToken == tKeyword)
     {
       // type ::= basetype
@@ -942,9 +964,7 @@ const CType* CParser::varDecl(CAstScope* s, bool isProc){
 	    { ct = CTypeManager::Get()->GetBool(); }
 	  
 	  ct_mem = ct;
-	  // Create array using type and expression
-	  vector<CType*> vec;
-	  vector<int> vec_val;
+	  
 	  if (_scanner->Peek().GetType() == tLSqBrak)
 	    {
 	      while (_scanner->Peek().GetType() == tLSqBrak)
@@ -986,7 +1006,7 @@ const CType* CParser::varDecl(CAstScope* s, bool isProc){
   
   // ### Need to do some fancy stuff to get pointers and arrays to work..
   ct_ret = ct;
-  if (isProc)
+  if (isProc && ct->IsArray())
     {
       ct = CTypeManager::Get()->GetPointer(ct);
     }
@@ -1107,19 +1127,37 @@ CAstScope* CParser::functionDecl(CAstScope* s){
   if(!str.compare("integer") || !str.compare("boolean") || !str.compare("char")){
     Consume(tKeyword, &t);
     
-    // Set DataType
+    const CType* ty;
+    const CArrayType* aty;
+    
+    // Get base type
     if (!str.compare("integer"))
       { 
-	temp->SetDataType( CTypeManager::Get()->GetInt() );
+	ty = CTypeManager::Get()->GetInt();
+	//temp->SetDataType( CTypeManager::Get()->GetInt() );
       }
     if (!str.compare("char"))
       { 
-	temp->SetDataType( CTypeManager::Get()->GetChar() );
+	ty = CTypeManager::Get()->GetChar();
+	//temp->SetDataType( CTypeManager::Get()->GetChar() );
       }
     if (!str.compare("boolean"))
       { 
-	temp->SetDataType( CTypeManager::Get()->GetBool() );
+	ty = CTypeManager::Get()->GetBool();
+	//temp->SetDataType( CTypeManager::Get()->GetBool() );
       }
+    /*
+    while ( _scanner->Peek().GetType() == tLSqBrak )
+      {
+	Consume(tLSqBrak);
+	Consume(tRSqBrak);
+	aty = new CArrayType(-1, ty);
+	ty = aty;
+      }
+    */
+    // Set data type
+    temp->SetDataType( ty );
+
   }
   else {
     SetError(_scanner->Peek(), "not a basetype");

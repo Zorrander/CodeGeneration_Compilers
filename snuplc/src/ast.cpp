@@ -1139,7 +1139,14 @@ bool CAstSpecialOp::TypeCheck(CToken *t, string *msg) const
 
 const CType* CAstSpecialOp::GetType(void) const
 {
-  return NULL;
+  if (GetOperation() == opAddress)
+    {
+      return CTypeManager::Get()->GetPointer(GetOperand()->GetType());
+    }
+  else
+    {
+      return NULL;
+    }
 }
 
 ostream& CAstSpecialOp::print(ostream &out, int indent) const
