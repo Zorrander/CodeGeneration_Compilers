@@ -759,7 +759,11 @@ CAstDesignator* CParser::qualident(CAstScope* s, CToken t)
 	{
 	  ty = ty->GetBaseType();
 	}
-      if ( ty->IsArray() )
+      if ( !ty->IsArray() )
+	{
+	  SetError(err, "variable not an array.");
+	}
+      else
 	{
 	  aty = dynamic_cast<const CArrayType*>(ty);
 	}
