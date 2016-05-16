@@ -120,13 +120,25 @@ void CParser::InitSymbolTable(CSymtab *s)
   CTypeManager *tm = CTypeManager::Get();
   
   // TODO: add predefined functions here
-  s->AddSymbol( new CSymProc("DIM", tm->GetInt()) );
-  s->AddSymbol( new CSymProc("DOFS", tm->GetInt()) );
-  s->AddSymbol( new CSymProc("ReadInt", tm->GetInt()) );
-  s->AddSymbol( new CSymProc("WriteChar", tm->GetNull()) );
-  s->AddSymbol( new CSymProc("WriteInt", tm->GetNull()) );
-  s->AddSymbol( new CSymProc("WriteLn", tm->GetNull()) );
-  s->AddSymbol( new CSymProc("WriteStr", tm->GetNull()) );
+  CSymProc* csp;
+
+  s->AddSymbol( csp = new CSymProc("DIM", tm->GetInt()) );
+  s->AddSymbol( csp = new CSymProc("DOFS", tm->GetInt()) );
+  s->AddSymbol( csp = new CSymProc("ReadInt", tm->GetInt()) );
+
+  s->AddSymbol( csp = new CSymProc("WriteChar", tm->GetNull()) );
+  csp->AddParam( new CSymParam(0, "c", tm->GetChar()) );
+
+  s->AddSymbol( csp = new CSymProc("WriteInt", tm->GetNull()) );
+  csp->AddParam( new CSymParam(0, "x", tm->GetInt()) );
+  
+  s->AddSymbol( csp = new CSymProc("WriteLn", tm->GetNull()) );
+  //csp->AddParam( new CSymParam(0, "str", tm->GetPointer( tm->GetArray( -1, tm->GetChar() ))) );
+  
+  s->AddSymbol( csp = new CSymProc("WriteStr", tm->GetNull()) );
+  csp->AddParam( new CSymParam(0, "str", tm->GetPointer( tm->GetArray( -1, tm->GetChar() ))) );
+  //csp->AddParam( new CSymParam(0, "str", tm->GetPointer(CTypeManager::Get()->GetChar())) );
+  
 }
 
 CAstModule* CParser::module(void)
@@ -851,7 +863,6 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
   else
     {
       ex = expression(s);
-          
       if(ex->GetType()->IsArray())
 	{
 	  spec = new CAstSpecialOp(ex->GetToken(), opAddress, ex, NULL);
@@ -865,6 +876,7 @@ CAstStatCall* CParser::subroutineCall(CAstScope* s, CToken t, int dummy)
       while (_scanner->Peek().GetType() == tComma)
 	{
 	  Consume(tComma, &t);
+	  ex = expression(s);
 	  if (ex->GetType()->IsArray())
 	    {
 	      spec = new CAstSpecialOp(ex->GetToken(), opAddress, ex, NULL);

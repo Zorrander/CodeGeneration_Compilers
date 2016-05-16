@@ -1638,7 +1638,10 @@ bool CAstStringConstant::TypeCheck(CToken *t, string *msg) const
 
 const CType* CAstStringConstant::GetType(void) const
 {
-  return NULL;
+  
+  //return CTypeManager::Get()->GetPointer(_type);
+  return _type;
+  //return NULL;
 }
 
 ostream& CAstStringConstant::print(ostream &out, int indent) const
