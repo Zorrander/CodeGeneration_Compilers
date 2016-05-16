@@ -1134,7 +1134,7 @@ CAstExpression* CAstSpecialOp::GetOperand(void) const
 
 bool CAstSpecialOp::TypeCheck(CToken *t, string *msg) const
 {
-  return false;
+  return GetOperand()->TypeCheck(t, msg);
 }
 
 const CType* CAstSpecialOp::GetType(void) const
@@ -1238,7 +1238,6 @@ bool CAstFunctionCall::TypeCheck(CToken *t, string *msg) const
     {
       parm[i] = sp->GetParam(i);
     }
-   cout << "call: " << N_call << " decl: " << N_decl << endl;
 
   if (N_call != N_decl) 
     {
@@ -1342,7 +1341,8 @@ const CSymbol* CAstDesignator::GetSymbol(void) const
 bool CAstDesignator::TypeCheck(CToken *t, string *msg) const
 {
   // ### ToDo
-  cout << "todo castDesignator" << endl;
+  //cout << "todo castDesignator" << endl;
+  
   return true;
 }
 
@@ -1433,11 +1433,9 @@ bool CAstArrayDesignator::TypeCheck(CToken *t, string *msg) const
   for (int i = 0; i < GetNIndices(); i++)
     {
       if ( GetIndex(i)->TypeCheck(t, msg) && GetIndex(i)->GetType() == CTypeManager::Get()->GetInt() )
-	{
-	  result = true;
-	}
+	{  }
       else
-	result = false;
+	return false;
     }
 
   return result;
