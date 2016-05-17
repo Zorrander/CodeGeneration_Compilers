@@ -93,10 +93,11 @@ class CType {
     ///
     /// @retval int data size in bytes
     virtual int GetDataSize(void) const;
-
+    
     /// @brief return the base type of array/pointer types
     /// @retval CType* base type (int|bool|char|null)
     virtual const CType* GetBaseType(void) const { return NULL; };
+    
 
     /// @brief return the alignment requirements for this type
     /// @retval int aligmnent in bytes
@@ -366,7 +367,7 @@ class CPointerType : public CScalarType {
 
     /// @brief return the base type
     /// @retval CType* base type
-    const CType* GetBaseType(void) const;
+    const CType* GetBaseType(void) const ;
 
     /// @}
 
@@ -378,6 +379,16 @@ class CPointerType : public CScalarType {
     /// @retval true if the types match (are compatible)
     /// @retval false if the types do not match (are not compatible)
     virtual bool Match(const CType *t) const;
+
+    /// @brief compare two pointer types
+    ///
+    /// CPointerType::Compare() is identical to Match() but does not support
+    /// pointers to open arrays.
+    ///
+    /// @param t type to compare this type to
+    /// @retval true if the types are equal
+    /// @retval false if the types are not equal
+    virtual bool Compare(const CType *t) const;
 
     /// @}
 
@@ -455,8 +466,7 @@ class CArrayType : public CType {
     ///
     /// CArrayType::Match() matches this type with type @t. The matching is
     /// performed recursively on each dimension down to the base type.
-    /// On each dimension, the number of elements must match o one of the arrays
-    /// must have dimension of CArrayType::OPEN
+    /// In each dimension, the number of elements must match or this have dimension CArrayType::OPEN
     ///
     /// @param t type to compare this type to
     /// @retval true if the types match (are compatible)

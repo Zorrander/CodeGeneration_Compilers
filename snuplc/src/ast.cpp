@@ -1239,6 +1239,7 @@ bool CAstFunctionCall::TypeCheck(CToken *t, string *msg) const
       parm[i] = sp->GetParam(i);
     }
 
+  
   if (N_call != N_decl) 
     {
       if (t != NULL) { *t = GetToken(); }
@@ -1248,8 +1249,10 @@ bool CAstFunctionCall::TypeCheck(CToken *t, string *msg) const
 
   for (int i = 0; i < N_call; i++)
     {
-      if (expr[i]->GetType() != parm[i]->GetDataType())
-	{
+      
+      if (parm[i]->GetDataType()->Match(expr[i]->GetType()) == false)
+      {
+    
 	  if (t != NULL) { *t = expr[i]->GetToken(); }
 	  if (msg != NULL) { *msg = "type mismatch in function/procedure parameters."; }
 	  return false;
