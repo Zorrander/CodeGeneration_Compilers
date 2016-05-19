@@ -1434,6 +1434,14 @@ void CAstArrayDesignator::toDot(ostream &out, int indent) const {
 
 CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
      cout << "CAstArrayDesignator::ToTac" << endl ;
+     CTacName* address = new CTacName(_symbol) ;
+     CTacTemp * storage = cb->CreateTemp(GetType());
+             
+     CTacInstr *addrArray = new CTacInstr(opAddress, storage, 
+             address);
+
+    cb->AddInstr(addrArray);
+    
     return NULL;
 }
 
