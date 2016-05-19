@@ -228,7 +228,7 @@ CTacAddr* CAstScope::ToTac(CCodeBlock *cb) {
     while (s != NULL) {
         CTacLabel *next = cb->CreateLabel();
         s->ToTac(cb, next);
-        cb->AddInstr(next);
+        //cb->AddInstr(next);
         s = s->GetNext();
     }
    
@@ -965,14 +965,14 @@ void CAstBinaryOp::toDot(ostream &out, int indent) const {
 }
 
 CTacAddr* CAstBinaryOp::ToTac(CCodeBlock *cb) {
-     cout << "CAstBinaryOp::ToTac" << endl ;
-    CTacAddr* resultAddr = GetLeft()->ToTac(cb) ;    
+    cout << "CAstBinaryOp::ToTac" << endl ;   
+    CTacTemp * storage = cb->CreateTemp(GetType());
     
-    CTacInstr *ope = new CTacInstr(GetOperation(), resultAddr, 
+    CTacInstr *ope = new CTacInstr(GetOperation(), storage, 
             GetLeft()->ToTac(cb), GetRight()->ToTac(cb) ) ;
 
     cb->AddInstr(ope);
-    return resultAddr;
+    return storage;
 }
 
 CTacAddr* CAstBinaryOp::ToTac(CCodeBlock *cb,
