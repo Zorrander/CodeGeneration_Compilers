@@ -437,10 +437,13 @@ CTacAddr* CAstStatAssign::ToTac(CCodeBlock *cb, CTacLabel *next) {
     rhs = GetRHS();
     
     CTacAddr* lhsAddr = lhs->ToTac(cb) ;
+    cout << "lhsAddr : " << lhsAddr << endl ;
     CTacAddr* rhsAddr = rhs->ToTac(cb) ;
+    cout << "rhsAddr : " << rhsAddr << endl ;
     CTacInstr* assign = new CTacInstr(opAssign, lhsAddr, rhsAddr ) ;
-    cb->AddInstr(assign);
     
+    cb->AddInstr(assign);
+    cout << "assign successful" << endl ;
     return lhsAddr;
 }
 
@@ -731,27 +734,25 @@ void CAstStatIf::toDot(ostream &out, int indent) const {
 
 CTacAddr* CAstStatIf::ToTac(CCodeBlock *cb, CTacLabel *next) {
     cout << "CAstStatIf::ToTac" << endl ;
-    //deal with the condition
-    CTacInstr *statIfCond, *statIfTrue, *statIfFalse ;  
+      
     CTacLabel *statIfFalseLabel, *statIfTrueLabel ;
     CAstExpression* ifCond ;
-    CTacAddr* ifCondTac ;
+    CTacAddr* ifCondTac, *bodyTac, *elseTac ;
     
     ifCond = GetCondition() ;
-     
-    ifCondTac = ifCond->ToTac(cb, statIfTrueLabel, statIfFalseLabel) ;
-   
-    statIfCond = new CTacInstr(opGoto, ifCondTac ) ;
-    cb->AddInstr(statIfCond) ;
-    //branch to the body depending on true or false before 
-    cout << "CAstStatIfCond::ToTac" << endl ;
-    statIfTrue = new CTacInstr(opGoto, GetIfBody()->ToTac(cb, next) ) ;
-    cout << "CAstStatIfTrue::ToTac" << endl ;
-    statIfFalse = new CTacInstr(opGoto, GetElseBody()->ToTac(cb, next) ) ;
-    cout << "CAstStatIfFalse::ToTac" << endl ;
+    statIfTrueLabel = cb->CreateLabel("ifTrue");
+    statIfFalseLabel = cb->CreateLabel("ifFalse");
     
-    cb->AddInstr(statIfTrue) ;
-    cb->AddInstr(statIfFalse) ;
+    ifCondTac = ifCond->ToTac(cb, statIfTrueLabel, statIfFalseLabel) ;
+    
+    //branch to the body depending on true or false before
+    CTacInstr* labelInstrTre = new CTacInstr(opLabel, statIfTrueLabel ); 
+    cb->AddInstr(labelInstrTre); 
+    bodyTac = GetIfBody()->ToTac(cb, next) ;
+    
+    CTacInstr* labelInstrFalse = new CTacInstr(opLabel, statIfFalseLabel ); 
+    cb->AddInstr(labelInstrFalse); 
+    elseTac = GetElseBody()->ToTac(cb, next) ;
     
     return NULL;
 }
@@ -1036,18 +1037,19 @@ CTacAddr* CAstBinaryOp::ToTac(CCodeBlock *cb,
         CTacLabel *ltrue, CTacLabel *lfalse) {
     cout << "CAstBinaryOp::ToTac2" << endl ;
      
-    CTacTemp * storage ;
+   
     CTacAddr* lhs, *rhs ; 
     
     lhs = GetLeft()->ToTac(cb) ;
     rhs = GetRight()->ToTac(cb) ;    
-    storage = cb->CreateTemp(GetType());
 
-    CTacInstr *ope = new CTacInstr(GetOperation(), storage, lhs, rhs ) ;
-        cout << rhs << endl ;
+    CTacInstr *ope = new CTacInstr(GetOperation(), ltrue, lhs, rhs ) ;
+    CTacInstr *elseOpe = new CTacInstr(opGoto, lfalse) ;
+     
     cb->AddInstr(ope);
+    cb->AddInstr(elseOpe);
     
-    return  storage;
+    return lhs;
 }
 
 
@@ -1384,9 +1386,9 @@ void CAstDesignator::toDot(ostream &out, int indent) const {
 }
 
 CTacAddr* CAstDesignator::ToTac(CCodeBlock *cb) {
-     cout << "CAstDesignator::ToTac" << endl ;
+    cout << "CAstDesignator::ToTac" << endl ;
     CTacName* qualident = new CTacName( GetSymbol() );
-    
+    cout << "designator : " << qualident << endl ;
     return qualident;
 }
 
@@ -1581,7 +1583,7 @@ CTacAddr* CAstConstant::ToTac(CCodeBlock *cb) {
     cout << "CAstConstant::ToTac" << endl ;
  
     CTacConst* constant = new CTacConst( (int) GetValue() );    
-    cout << GetValue() << endl ;
+    cout << "constant : " << constant << endl ;
     return constant;  
     
 }
