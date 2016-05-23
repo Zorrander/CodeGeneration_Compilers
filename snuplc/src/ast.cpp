@@ -1525,15 +1525,25 @@ void CAstArrayDesignator::toDot(ostream &out, int indent) const {
 
 CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
      cout << "CAstArrayDesignator::ToTac" << endl ;
+     
+     /**
+      *First get the address of A 
+      */
      CTacName* address = new CTacName(_symbol) ;
-     CTacTemp * storage = cb->CreateTemp(GetType());
-             
-     CTacInstr *addrArray = new CTacInstr(opAddress, storage, 
-             address);
-
-    cb->AddInstr(addrArray);
-    
-    return NULL;
+     CTacTemp * storage = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opAddress, storage, address)) ;
+     
+     /**
+      * Get the size of the second dimension
+      * can be queried by DIM(A, i) 
+      */
+     cb->AddInstr(new CTacInstr(opParam, new CTacConst(1), new CTacConst(2))) ;
+     storage = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opAddress, storage, address)) ;
+     cb->AddInstr(new CTacInstr(opParam, new CTacConst(0), storage)) ;
+     
+     
+    return address;
 }
 
 CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb,
