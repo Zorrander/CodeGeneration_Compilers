@@ -1525,27 +1525,59 @@ void CAstArrayDesignator::toDot(ostream &out, int indent) const {
 
 CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
      cout << "CAstArrayDesignator::ToTac" << endl ;
-     
+     CTacTemp * storage0, *storage1, *storage2, *storage3,*storage4,
+             *storage5, *storage6, *storage7, *storage8, *storage9 ;
+             
      /**
       *First get the address of A 
       */
      CTacName* address = new CTacName(_symbol) ;
-     CTacTemp * storage = cb->CreateTemp(GetType()) ;
-     cb->AddInstr(new CTacInstr(opAddress, storage, address)) ;
+     storage0 = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opAddress, storage0, address)) ;
      
      /**
       * Get the size of the second dimension
       * can be queried by DIM(A, i) 
       */
      cb->AddInstr(new CTacInstr(opParam, new CTacConst(1), new CTacConst(2))) ;
-     storage = cb->CreateTemp(GetType()) ;
-     cb->AddInstr(new CTacInstr(opAddress, storage, address)) ;
-     cb->AddInstr(new CTacInstr(opParam, new CTacConst(0), storage)) ;
+     storage1 = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opAddress, storage1, address)) ;
+     cb->AddInstr(new CTacInstr(opParam, new CTacConst(0), storage1)) ;
      
+     const CSymbol* s = GetSymbol() ;
+     const CSymtab* t = s->GetSymbolTable() ;     
+     const CSymbol* dimSymbol = t->FindSymbol("DIM") ;
+     storage2 = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opCall, storage2, new CTacName(dimSymbol) )) ;
+    
+     // mul t3 <- 1, t2 # multiply by first array index expression (1)
+     storage3 = cb->CreateTemp(GetType()) ;
+     cout << GetNIndices() << endl ;
+    cb->AddInstr(new CTacInstr(opMul, storage3, GetIndex(1)->ToTac(cb), storage2)) ;    
+     //6: add t4 <- t3, 3 # add second array index expression
+    storage4 = cb->CreateTemp(GetType()) ;
+    cb->AddInstr(new CTacInstr(opAdd, storage4, storage3, GetIndex(0)->ToTac(cb) )) ;    
+     //7: mul t5 <- t4, 4 # multiply by array element size
+    storage5 = cb->CreateTemp(GetType()) ;
+    cb->AddInstr(new CTacInstr(opMul, storage5, storage4, new CTacConst(4) )) ;
+    
+    //get offset of data
+     storage6 = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opAddress, storage6, address)) ;
+     cb->AddInstr(new CTacInstr(opParam, new CTacConst(0), storage6)) ;
+    // call t7 <- DOFS # call DOFS(A)
+     const CSymbol* dofsSymbol = t->FindSymbol("DOFS") ;
+     storage7 = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opCall, storage7, new CTacName(dofsSymbol) )) ;
+    // add t8 <- t5, t7 # add element offset to data offset
+     storage8 = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opAdd, storage8, storage5, storage7 )) ;
+    // add t9 <- t0, t8 # add address of A
+     storage9 = cb->CreateTemp(GetType()) ;
+     cb->AddInstr(new CTacInstr(opAdd, storage9, storage0, storage8 )) ;   
      
-    return address;
+     return new CTacReference(storage9->GetSymbol());
 }
-
 CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb,
         CTacLabel *ltrue, CTacLabel *lfalse) {
     cout << "CAstArrayDesignator::ToTac2" << endl ;
@@ -1668,7 +1700,6 @@ const CType* CAstStringConstant::GetType(void) const {
 
 ostream& CAstStringConstant::print(ostream &out, int indent) const {
     string ind(indent, ' ');
-
     out << ind << '"' << GetValueStr() << '"' << " ";
 
     const CType *t = GetType();
