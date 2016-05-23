@@ -740,20 +740,23 @@ CTacAddr* CAstStatIf::ToTac(CCodeBlock *cb, CTacLabel *next) {
     CTacAddr* ifCondTac, *bodyTac, *elseTac ;
     
     ifCond = GetCondition() ;
-    statIfTrueLabel = cb->CreateLabel("ifTrue");
-    statIfFalseLabel = cb->CreateLabel("ifFalse");
+    statIfTrueLabel = cb->CreateLabel("if_true");
+    statIfFalseLabel = cb->CreateLabel("if_false");
     
     ifCondTac = ifCond->ToTac(cb, statIfTrueLabel, statIfFalseLabel) ;
     
     //branch to the body depending on true or false before
     CTacInstr* labelInstrTre = new CTacInstr(opLabel, statIfTrueLabel ); 
     cb->AddInstr(labelInstrTre); 
-    bodyTac = GetIfBody()->ToTac(cb, next) ;
+    bodyTac = GetIfBody()->ToTac(cb, next) ; 
+    cb->AddInstr(new CTacInstr(opGoto, next));
     
     CTacInstr* labelInstrFalse = new CTacInstr(opLabel, statIfFalseLabel ); 
     cb->AddInstr(labelInstrFalse); 
     elseTac = GetElseBody()->ToTac(cb, next) ;
     
+    
+   
     return NULL;
 }
 
@@ -850,6 +853,23 @@ void CAstStatWhile::toDot(ostream &out, int indent) const {
 
 CTacAddr* CAstStatWhile::ToTac(CCodeBlock *cb, CTacLabel *next) {
     cout << "CAstStatWhile::ToTac" << endl ;
+    CTacLabel *statIfFalseLabel, *statIfTrueLabel, *whileCond, *whileBody ;
+    
+    whileCond = new CTacLabel("while_cond") ; 
+    whileBody = new CTacLabel("while_body") ;
+    
+    CTacInstr* labelWhile = new CTacInstr(opLabel, whileCond ); 
+    cb->AddInstr(labelWhile); 
+    GetCondition()->ToTac(cb, whileBody, next) ;
+    
+    labelWhile = new CTacInstr(opLabel, whileBody ); 
+    cb->AddInstr(labelWhile); 
+    GetBody()->ToTac(cb, next) ;
+    
+    labelWhile = new CTacInstr(opGoto, whileCond ); 
+    cb->AddInstr(labelWhile); 
+    
+    
     return NULL;
 }
 
