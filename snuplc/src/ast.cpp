@@ -437,13 +437,11 @@ CTacAddr* CAstStatAssign::ToTac(CCodeBlock *cb, CTacLabel *next) {
     rhs = GetRHS();
     
     CTacAddr* lhsAddr = lhs->ToTac(cb) ;
-    cout << "lhsAddr : " << lhsAddr << endl ;
     CTacAddr* rhsAddr = rhs->ToTac(cb) ;
-    cout << "rhsAddr : " << rhsAddr << endl ;
     CTacInstr* assign = new CTacInstr(opAssign, lhsAddr, rhsAddr ) ;
     
     cb->AddInstr(assign);
-    cout << "assign successful" << endl ;
+    
     return lhsAddr;
 }
 
@@ -1419,7 +1417,6 @@ void CAstDesignator::toDot(ostream &out, int indent) const {
 CTacAddr* CAstDesignator::ToTac(CCodeBlock *cb) {
     cout << "CAstDesignator::ToTac" << endl ;
     CTacName* qualident = new CTacName( GetSymbol() );
-    cout << "designator : " << qualident << endl ;
     return qualident;
 }
 
@@ -1538,44 +1535,57 @@ CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
      cout << "CAstArrayDesignator::ToTac" << endl ;
      CTacTemp * storage0, *storage1, *storage2, *storage3,*storage4,
              *storage5, *storage6, *storage7, *storage8, *storage9 ;
-             
+     const CSymbol* s, *dimSymbol ;
+     const CSymtab* t ;
+     CTacName* address ;
+     
+     s = GetSymbol() ;
+     t = s->GetSymbolTable() ;     
+     dimSymbol = t->FindSymbol("DIM") ;
      /**
       *First get the address of A 
       */
-     CTacName* address = new CTacName(_symbol) ;
-     storage0 = cb->CreateTemp(GetType()) ;
-     cb->AddInstr(new CTacInstr(opAddress, storage0, address)) ;
-     
+     address = new CTacName(GetSymbol()) ;
+     if (true) {
+       storage0 = cb->CreateTemp(GetType()) ;
+        cb->AddInstr(new CTacInstr(opAddress, storage0, address)) ;  
+     }    
      /**
-      * Get the size of the second dimension
+      * Get the size of the i dimension
       * can be queried by DIM(A, i) 
       */
-     cb->AddInstr(new CTacInstr(opParam, new CTacConst(1), new CTacConst(2))) ;
-     storage1 = cb->CreateTemp(GetType()) ;
-     cb->AddInstr(new CTacInstr(opAddress, storage1, address)) ;
-     cb->AddInstr(new CTacInstr(opParam, new CTacConst(0), storage1)) ;
      
-     const CSymbol* s = GetSymbol() ;
-     const CSymtab* t = s->GetSymbolTable() ;     
-     const CSymbol* dimSymbol = t->FindSymbol("DIM") ;
-     storage2 = cb->CreateTemp(GetType()) ;
-     cb->AddInstr(new CTacInstr(opCall, storage2, new CTacName(dimSymbol) )) ;
-    
-     // mul t3 <- 1, t2 # multiply by first array index expression (1)
-     storage3 = cb->CreateTemp(GetType()) ;
-     cout << GetNIndices() << endl ;
-    cb->AddInstr(new CTacInstr(opMul, storage3, GetIndex(1)->ToTac(cb), storage2)) ;    
-     //6: add t4 <- t3, 3 # add second array index expression
-    storage4 = cb->CreateTemp(GetType()) ;
-    cb->AddInstr(new CTacInstr(opAdd, storage4, storage3, GetIndex(0)->ToTac(cb) )) ;    
-     //7: mul t5 <- t4, 4 # multiply by array element size
-    storage5 = cb->CreateTemp(GetType()) ;
-    cb->AddInstr(new CTacInstr(opMul, storage5, storage4, new CTacConst(4) )) ;
-    
-    //get offset of data
-     storage6 = cb->CreateTemp(GetType()) ;
-     cb->AddInstr(new CTacInstr(opAddress, storage6, address)) ;
-     cb->AddInstr(new CTacInstr(opParam, new CTacConst(0), storage6)) ;
+     for (int i = 2; i <= GetNIndices(); i++) {
+         cb->AddInstr(new CTacInstr(opParam, new CTacConst(1), new CTacConst(i))) ;
+     
+        if (true) {
+           storage1 = cb->CreateTemp(GetType()) ;
+           cb->AddInstr(new CTacInstr(opAddress, storage1, address)) ;  
+        }
+         cb->AddInstr(new CTacInstr(opParam, new CTacConst(0), storage1)) ;
+        
+        storage2 = cb->CreateTemp(GetType()) ;
+        cb->AddInstr(new CTacInstr(opCall, storage2, new CTacName(dimSymbol) )) ;
+         
+        storage3 = cb->CreateTemp(GetType()) ;
+        if (i == 2 ){ //  multiply by first array index expression (1)
+            cb->AddInstr(new CTacInstr(opMul, storage3, GetIndex(GetNIndices()-1)->ToTac(cb), storage2)) ;    
+        }else { // need to multiply the last result
+            cb->AddInstr(new CTacInstr(opMul, storage3, storage4, storage2)) ; 
+        }
+        // add second array index expression
+        storage4 = cb->CreateTemp(GetType()) ;
+        cb->AddInstr(new CTacInstr(opAdd, storage4, storage3, GetIndex(GetNIndices()-i)->ToTac(cb) )) ;    
+              
+     }
+     // multiply by array element size
+        storage5 = cb->CreateTemp(GetType()) ;
+        cb->AddInstr(new CTacInstr(opMul, storage5, storage4, new CTacConst(4) )) ; 
+        
+     //get offset of data
+        storage6 = cb->CreateTemp(GetType()) ;
+        cb->AddInstr(new CTacInstr(opAddress, storage6, address)) ;
+        cb->AddInstr(new CTacInstr(opParam, new CTacConst(0), storage6)) ;  
     // call t7 <- DOFS # call DOFS(A)
      const CSymbol* dofsSymbol = t->FindSymbol("DOFS") ;
      storage7 = cb->CreateTemp(GetType()) ;
@@ -1584,8 +1594,11 @@ CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
      storage8 = cb->CreateTemp(GetType()) ;
      cb->AddInstr(new CTacInstr(opAdd, storage8, storage5, storage7 )) ;
     // add t9 <- t0, t8 # add address of A
-     storage9 = cb->CreateTemp(GetType()) ;
-     cb->AddInstr(new CTacInstr(opAdd, storage9, storage0, storage8 )) ;   
+     if (true) {
+       storage9 = cb->CreateTemp(GetType()) ;
+       cb->AddInstr(new CTacInstr(opAdd, storage9, storage0, storage8 )) ;   
+     }
+       
      
      return new CTacReference(storage9->GetSymbol());
 }
