@@ -746,17 +746,26 @@ CTacAddr* CAstStatIf::ToTac(CCodeBlock *cb, CTacLabel *next) {
     ifCondTac = ifCond->ToTac(cb, statIfTrueLabel, statIfFalseLabel) ;
     
     //branch to the body depending on true or false before
-    CTacInstr* labelInstrTre = new CTacInstr(opLabel, statIfTrueLabel ); 
-    cb->AddInstr(labelInstrTre); 
-    bodyTac = GetIfBody()->ToTac(cb, next) ; 
+    
+    cb->AddInstr(statIfTrueLabel); 
+
+    CAstStatement *s = GetIfBody();
+    while (s != NULL) {
+        CTacLabel *next = cb->CreateLabel();
+        s->ToTac(cb, next);
+        s = s->GetNext();
+    }
+
     cb->AddInstr(new CTacInstr(opGoto, next));
     
-    CTacInstr* labelInstrFalse = new CTacInstr(opLabel, statIfFalseLabel ); 
-    cb->AddInstr(labelInstrFalse); 
-    elseTac = GetElseBody()->ToTac(cb, next) ;
+    cb->AddInstr(statIfFalseLabel); 
+    s = GetElseBody();
+    while (s != NULL) {
+        CTacLabel *next = cb->CreateLabel();
+        s->ToTac(cb, next);
+        s = s->GetNext();
+    }
     
-    
-   
     return NULL;
 }
 
@@ -855,20 +864,22 @@ CTacAddr* CAstStatWhile::ToTac(CCodeBlock *cb, CTacLabel *next) {
     cout << "CAstStatWhile::ToTac" << endl ;
     CTacLabel *statIfFalseLabel, *statIfTrueLabel, *whileCond, *whileBody ;
     
-    whileCond = new CTacLabel("while_cond") ; 
-    whileBody = new CTacLabel("while_body") ;
-    
-    CTacInstr* labelWhile = new CTacInstr(opLabel, whileCond ); 
-    cb->AddInstr(labelWhile); 
+    whileCond = new CTacLabel("1_while_cond") ; 
+    whileBody = new CTacLabel("2_while_body") ;
+        
+    cb->AddInstr(whileCond); 
     GetCondition()->ToTac(cb, whileBody, next) ;
     
-    labelWhile = new CTacInstr(opLabel, whileBody ); 
-    cb->AddInstr(labelWhile); 
-    GetBody()->ToTac(cb, next) ;
+    cb->AddInstr(whileBody);
     
-    labelWhile = new CTacInstr(opGoto, whileCond ); 
-    cb->AddInstr(labelWhile); 
-    
+    CAstStatement *s = GetBody();
+    while (s != NULL) {
+        CTacLabel *next = cb->CreateLabel();
+        s->ToTac(cb, next);
+	s = s->GetNext();
+    }
+
+    cb->AddInstr(new CTacInstr(opGoto, whileCond )); 
     
     return NULL;
 }
