@@ -1642,7 +1642,9 @@ CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
    * Get the size of the i dimension
    * can be queried by DIM(A, i) 
    */
-     
+  if (GetNIndices() == 1){
+      
+  }  else {
   for (int i = 2; i <= GetNIndices(); i++) {
     cb->AddInstr(new CTacInstr(opParam, new CTacConst(1), new CTacConst(i))) ;
      
@@ -1669,11 +1671,14 @@ CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
     storage4 = cb->CreateTemp(GetType()) ;
     cb->AddInstr(new CTacInstr(opAdd, storage4, storage3, GetIndex(GetNIndices()-i)->ToTac(cb) )) ;    
               
-  }
+  }}
   // multiply by array element size
   storage5 = cb->CreateTemp(GetType()) ;
+  if (GetNIndices() == 1 ){  
+  cb->AddInstr(new CTacInstr(opMul, storage5, GetIndex(0)->ToTac(cb), new CTacConst(4) )) ;  
+  } else {
   cb->AddInstr(new CTacInstr(opMul, storage5, storage4, new CTacConst(4) )) ; 
-        
+  }
   //get offset of data
   if ( s->GetDataType()->IsArray() )
     {
@@ -1707,6 +1712,7 @@ CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
      
   return new CTacReference(storage9->GetSymbol());
 }
+
 CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb,
 				     CTacLabel *ltrue, CTacLabel *lfalse) {
   cout << "CAstArrayDesignator::ToTac2" << endl ;
