@@ -234,7 +234,8 @@ int CArrayType::GetDataSize(void) const
 
 int CArrayType::GetAlign(void) const
 {
-  return GetInnerType()->GetAlign();
+  // arrays must be 4-aligned since we have integer meta-data at the beginning
+  return 4;
 }
 
 const CType* CArrayType::GetBaseType(void) const
@@ -260,15 +261,12 @@ bool CArrayType::Match(const CType *t) const
   if (t->IsArray()) {
     const CArrayType *at = dynamic_cast<const CArrayType*>(t);
     assert(at != NULL);
-    
+
     // match if:
     // - (this is an open array or the number of elements match) and
     // - the inner types are compatible with respect to Match()
-    
-    cout << "NElem" << GetNElem() << endl ; 
-    cout << "declaredParamElem" << at->GetNElem() << endl ; 
     return ((GetNElem() == at->GetNElem()) ||
-            (GetNElem() == OPEN))  &&
+            (GetNElem() == OPEN)) &&
            (GetInnerType()->Match(at->GetInnerType()));
   } else {
     return false;

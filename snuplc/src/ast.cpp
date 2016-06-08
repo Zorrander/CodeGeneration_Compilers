@@ -1710,7 +1710,7 @@ CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb) {
     }
        
      
-  return new CTacReference(storage9->GetSymbol());
+  return new CTacReference(storage9->GetSymbol(), storage9->GetSymbol());
 }
 
 CTacAddr* CAstArrayDesignator::ToTac(CCodeBlock *cb,

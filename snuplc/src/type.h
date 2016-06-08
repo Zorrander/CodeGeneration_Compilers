@@ -311,6 +311,7 @@ class CBoolType : public CScalarType {
     /// @name property querying
     /// @{
 
+   
     /// @brief return @a true for boolean types, @a false otherwise
     virtual bool IsBoolean(void) const { return true; };
 
@@ -350,7 +351,6 @@ class CPointerType : public CScalarType {
   public:
     /// @name property querying
     /// @{
-
     /// @brief return @a true for scalar types, @a false otherwise
     virtual bool IsScalar(void) const { return true; };
 
