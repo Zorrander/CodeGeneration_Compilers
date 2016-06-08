@@ -137,7 +137,13 @@ void CBackendx86::EmitCode(void)
   // forall s in subscopes do
   //   EmitScope(s)
   // EmitScope(program)
-
+  const vector<CScope*> children = _m->GetSubscopes();
+  for (int i = 0; i < children.size(); i++)
+    {
+      EmitScope(children.at(i));
+    }
+  EmitScope(_m);
+  
   _out << _ind << "# end of text section" << endl
        << _ind << "#-----------------------------------------" << endl
        << endl;
@@ -190,6 +196,9 @@ void CBackendx86::EmitScope(CScope *scope)
 
   // TODO
   // ComputeStackOffsets(scope)
+  int param_ofs, local_ofs;
+  param_ofs = local_ofs = 0;
+  ComputeStackOffsets(scope->GetSymbolTable(), param_ofs, local_ofs);
   //
   // emit function prologue
   //
@@ -470,16 +479,34 @@ size_t CBackendx86::ComputeStackOffsets(CSymtab *symtab,
   vector<CSymbol*> slist = symtab->GetSymbols();
 
   // TODO
-  size_t size = 0 ; 
+  size_t size = 0; 
   // foreach local symbol l in slist do
   //   compute aligned offset on stack and store in symbol l
   //   set base register to %ebp
-  //
+
+  _out << "# stack offsets: " << endl;
+  for (int i = 0; i < slist.size(); i++)
+    {
+      if (slist.at(i)->GetSymbolType() == stLocal)
+	{
+	  local_ofs += 4;
+	  _out << "#\t-" << local_ofs << "(%ebp)\t" << "4" << endl;
+	  slist.at(i)->SetOffset(local_ofs);
+	}
+      else
+	{
+	  param_ofs += 4;
+	  _out << "#\t-" << param_ofs << "(%ebp)\t" << "4" << endl;
+	  slist.at(i)->SetOffset(param_ofs);
+	}
+    }
+  
   // foreach parameter p in slist do
   //   compute offset on stack and store in symbol p
   //   set base register to %ebp
   //
   // align size
+  size = local_ofs + param_ofs;
   //
   // dump stack frame to assembly file
 
