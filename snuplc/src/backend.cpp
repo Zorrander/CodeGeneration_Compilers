@@ -184,8 +184,10 @@ CScope* CBackendx86::GetScope(void) const
 void CBackendx86::EmitScope(CScope *scope)
 {
   assert(scope != NULL);
-
+  size_t offset ;
   string label;
+  CCodeBlock * cb ;
+  cb = scope->GetCodeBlock() ;
 
   if (scope->GetParent() == NULL) label = "main";
   else label = scope->GetName();
@@ -198,15 +200,45 @@ void CBackendx86::EmitScope(CScope *scope)
   // ComputeStackOffsets(scope)
   int param_ofs, local_ofs;
   param_ofs = local_ofs = 0;
-  ComputeStackOffsets(scope->GetSymbolTable(), param_ofs, local_ofs);
+  offset = ComputeStackOffsets(scope->GetSymbolTable(), param_ofs, local_ofs);
   //
-  // emit function prologue
-  //
+  
+  /*****************************
+   *  emit function prologue *
+  *****************************/
+  _out << endl;
+  _out << _ind << "# prologue " << endl ;
+  
+  EmitInstruction("pushl", "%ebp") ; 
+  EmitInstruction("movl", "%esp, %ebp") ;
+  EmitInstruction("pushl", "%ebx", "save callee saved registers") ;
+  EmitInstruction("pushl", "%esi") ;
+  EmitInstruction("pushl", "%edi") ;
+  EmitInstruction("subl", "$"+std::to_string(offset) + ", %esp", "make room for locals" ) ;
+  _out << endl;
+  if (true){
+      EmitInstruction("cld", "", "memset local stack area to 0" ) ; 
+      EmitInstruction("xorl", "%eax, %eax") ;
+  }else {
+       EmitInstruction("xorl", "%eax, %eax" , "memset local stack area to 0" ) ;
+  }
+  
   // forall i in instructions do
-  //   EmitInstruction(i)
-  //
+  /************************
+   *  EmitInstruction(i)  * 
+   ************************/     
+  _out << endl;
+  _out << _ind << "# function body " << endl ;
+  std::list<CTacInstr*> l = cb->GetInstr() ;
+  std::list<CTacInstr*>::iterator it = l.begin();
+  for (int i = 0 ; i < l.size() ; i++) {  
+      std::advance(it, i);      
+      EmitInstruction(*it) ;
+  }
+  
   // emit function epilogue
-
+  _out << endl;
+  _out << _ind << "# epilogue " << endl ;
   _out << endl;
 }
 
@@ -314,8 +346,30 @@ void CBackendx86::EmitInstruction(CTacInstr *i)
 
   EOperation op = i->GetOperation();
 
+  CTacAddr* source1, *source2 ;
+  CTacName* name1, *name2 ;
+  string s;
+  /*if (sym.GetSize() == 1)
+      s = "b";
+  else
+      s = "l";
+  */
+  
   switch (op) {
     // binary operators
+      case(opAdd) : 
+          source1 = i->GetSrc(1) ; 
+          source2 = i->GetSrc(2) ;
+          name1 = dynamic_cast<CTacName*>(source1) ;
+          name2 = dynamic_cast<CTacName*>(source2) ;
+          
+          EmitInstruction("movl", name1->GetSymbol()->GetName(), "%eax");
+          EmitInstruction("movl", name2->GetSymbol()->GetName(), "%ebx");
+          EmitInstruction("addl", "%ebx" , "%eax");
+          EmitInstruction("movl", "%eax" , "%eax");
+          break ;
+        
+      
     // dst = src1 op src2
     // TODO
     // unary operators
@@ -325,6 +379,14 @@ void CBackendx86::EmitInstruction(CTacInstr *i)
     // memory operations
     // dst = src1
     // TODO
+      case(opAssign) :
+          //Constant assignment
+          /*if (){
+              
+          }else if () {//Register assignment 
+              
+          }*/
+          break ;
 
     // pointer operations
     // dst = &src1
@@ -484,30 +546,35 @@ size_t CBackendx86::ComputeStackOffsets(CSymtab *symtab,
   //   compute aligned offset on stack and store in symbol l
   //   set base register to %ebp
 
+  // foreach parameter p in slist do
+  //   compute offset on stack and store in symbol p
+  //   set base register to %ebp
   _out << "# stack offsets: " << endl;
   for (int i = 0; i < slist.size(); i++)
     {
       if (slist.at(i)->GetSymbolType() == stLocal)
 	{
-	  local_ofs += 4;
-	  _out << "#\t-" << local_ofs << "(%ebp)\t" << "4" << endl;
-	  slist.at(i)->SetOffset(local_ofs);
+	  
+	  _out << "#\t-" << local_ofs + slist.at(i)->GetDataType()->GetSize() << "(%ebp)\t" << slist.at(i)->GetDataType()->GetSize() << "\t[ $" << slist.at(i)->GetName()
+                  << "\t" << slist.at(i)->GetDataType() << " (%ebp)-" << local_ofs + slist.at(i)->GetDataType()->GetSize() << " ]" << endl;
+          slist.at(i)->SetOffset(local_ofs);
+          local_ofs += 4;
+	 
 	}
       else
 	{
-	  param_ofs += 4;
-	  _out << "#\t-" << param_ofs << "(%ebp)\t" << "4" << endl;
-	  slist.at(i)->SetOffset(param_ofs);
+	  
+	  _out << "#\t-" << param_ofs + slist.at(i)->GetDataType()->GetSize() << "(%ebp)\t" << slist.at(i)->GetDataType()->GetSize() << "\t[ $" << slist.at(i)->GetName()
+                  << "\t" << slist.at(i)->GetDataType() << " (%ebp)-" << param_ofs + slist.at(i)->GetDataType()->GetSize() << " ]" << endl;
+          slist.at(i)->SetOffset(param_ofs);
+          param_ofs += 4;
+	  
 	}
     }
-  
-  // foreach parameter p in slist do
-  //   compute offset on stack and store in symbol p
-  //   set base register to %ebp
-  //
+ 
   // align size
   size = local_ofs + param_ofs;
-  //
+  
   // dump stack frame to assembly file
 
   return size;
