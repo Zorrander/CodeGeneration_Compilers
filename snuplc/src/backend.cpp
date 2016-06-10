@@ -140,6 +140,7 @@ void CBackendx86::EmitCode(void)
   const vector<CScope*> children = _m->GetSubscopes();
   for (int i = 0; i < children.size(); i++)
     {
+      
       EmitScope(children.at(i));
     }
   EmitScope(_m);
@@ -184,6 +185,8 @@ CScope* CBackendx86::GetScope(void) const
 void CBackendx86::EmitScope(CScope *scope)
 {
   assert(scope != NULL);
+  SetScope(scope);
+      
   size_t offset ;
   string label;
   CCodeBlock * cb ;
@@ -220,7 +223,7 @@ void CBackendx86::EmitScope(CScope *scope)
       EmitInstruction("cld", "", "memset local stack area to 0" ) ; 
       EmitInstruction("xorl", "%eax, %eax") ;
   }else {
-       EmitInstruction("xorl", "%eax, %eax" , "memset local stack area to 0" ) ;
+      EmitInstruction("xorl", "%eax, %eax" , "memset local stack area to 0" ) ;
   }
   
   // forall i in instructions do
@@ -228,13 +231,8 @@ void CBackendx86::EmitScope(CScope *scope)
    *  EmitInstruction(i)  * 
    ************************/     
   _out << endl;
-  _out << _ind << "# function body " << endl ;
-  std::list<CTacInstr*> l = cb->GetInstr() ;
-  std::list<CTacInstr*>::iterator it = l.begin();
-  for (int i = 0 ; i < l.size() ; i++) {  
-      std::advance(it, i);      
-      EmitInstruction(*it) ;
-  }
+  _out << _ind << "# function body " << endl ;  
+  EmitCodeBlock(cb);
   
   // emit function epilogue
   _out << endl;
@@ -345,49 +343,71 @@ void CBackendx86::EmitInstruction(CTacInstr *i)
   cmt << i;
 
   EOperation op = i->GetOperation();
-
-  CTacAddr* source1, *source2 ;
-  CTacName* name1, *name2 ;
-  string s;
-  /*if (sym.GetSize() == 1)
-      s = "b";
-  else
-      s = "l";
-  */
+  CScope* sc = GetScope() ;
+  const CSymbol* symbol ; 
+  int size ;
   
   switch (op) {
-    // binary operators
-      case(opAdd) : 
-          source1 = i->GetSrc(1) ; 
-          source2 = i->GetSrc(2) ;
-          name1 = dynamic_cast<CTacName*>(source1) ;
-          name2 = dynamic_cast<CTacName*>(source2) ;
-          
-          EmitInstruction("movl", name1->GetSymbol()->GetName(), "%eax");
-          EmitInstruction("movl", name2->GetSymbol()->GetName(), "%ebx");
-          EmitInstruction("addl", "%ebx" , "%eax");
-          EmitInstruction("movl", "%eax" , "%eax");
-          break ;
-        
       
+    // binary operators
     // dst = src1 op src2
     // TODO
+      case opAdd :
+      //case opSub :
+      case opMul :
+      //case opDiv :
+      //case opAnd :
+      //case opOr :          
+          EmitInstruction("movl", Operand(i->GetSrc(1)) + ", %eax", cmt.str());         
+          EmitInstruction("movl", Operand(i->GetSrc(2)) + ", %ebx");
+          
+          if (op == opAdd)
+             EmitInstruction("addl", "%ebx, %eax");  
+          else if (op == opMul)
+             EmitInstruction("imull", "%ebx");  
+          
+          symbol = sc->GetSymbolTable()->FindSymbol(Operand(i->GetSrc(1)));
+          
+          size = symbol->GetOffset() ; 
+          cmt.str("");
+          cmt << size ;
+          EmitInstruction("movl", "%eax, -" + cmt.str() + "(%ebp)"  );
+          
+          break ;              
+ 
     // unary operators
     // dst = op src1
     // TODO
-
+    case opNeg :
+    //case opPos :
+    //case opNot :
+        symbol = sc->GetSymbolTable()->FindSymbol(Operand(i->GetSrc(1)));
+        if (symbol != NULL){
+            EmitInstruction("movl", Operand(i->GetSrc(1)) + ", %eax", cmt.str());
+            EmitInstruction("negl", "%eax");
+            size = symbol->GetOffset() ;cmt.str("");
+            cmt << size ;
+            EmitInstruction("movl", "%eax, -" + cmt.str() + "(%ebp)"  );
+            
+        } 
+        else {
+            EmitInstruction("movl", Operand(i->GetSrc(1)) + ", %eax", cmt.str());
+            EmitInstruction("negl", "%eax");
+        }
+        
+        break ;
     // memory operations
     // dst = src1
     // TODO
-      case(opAssign) :
-          //Constant assignment
-          /*if (){
+      case opAssign :
+          if (false) {
               
-          }else if () {//Register assignment 
-              
-          }*/
-          break ;
-
+          }else {
+              //cmt << " assign\t" + Operand(i->GetDest()) + "  <-  " << i->GetSrc(1) ;
+              Load(i->GetSrc(1), "%eax", cmt.str() ) ;
+              Store(i->GetDest(), 'a', "") ;  
+          }
+       break ;
     // pointer operations
     // dst = &src1
     // TODO
@@ -405,6 +425,7 @@ void CBackendx86::EmitInstruction(CTacInstr *i)
     // conditional branching
     // if src1 relOp src2 then goto dst
     // TODO
+      
 
     // function call-related operations
     // TODO
@@ -430,7 +451,9 @@ void CBackendx86::EmitInstruction(string mnemonic, string args, string comment)
        << _ind
        << setw(7) << mnemonic << " "
        << setw(23) << args;
-  if (comment != "") _out << " # " << comment;
+  if (comment != ""){
+      _out << " # " << comment;
+  }
   _out << endl;
 }
 
@@ -474,12 +497,34 @@ void CBackendx86::Store(CTac *dst, char src_base, string comment)
 string CBackendx86::Operand(const CTac *op)
 {
   string operand;
-
   // TODO
   // return a string representing op
   // hint: take special care of references (op of type CTacReference)
-
-  return operand;
+  std::stringstream buffer ;
+  buffer << op ;
+  
+  CScope *cs = GetScope();
+  CSymtab *st = cs->GetSymbolTable();
+  vector<CSymbol*> slist = st->GetSymbols();
+ 
+  vector< CSymbol * > symbols = st->GetSymbols() ;
+  //CTacName
+  if (st->FindSymbol(buffer.str()) != NULL){
+      operand =  buffer.str() ;
+  }   
+  //CTacConstant
+  else if (buffer.str()[0] > 47 && buffer.str()[0] < 58){
+       operand =  Imm(atoi(buffer.str().c_str())) ;
+  }
+      
+  //CTacReference
+  
+  else {
+      
+  }
+  
+  
+  return operand ;
 }
 
 string CBackendx86::Imm(int value) const
